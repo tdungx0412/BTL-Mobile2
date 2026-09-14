@@ -11,6 +11,7 @@ export async function initializeShopDatabase(database: SQLiteDatabase) {
       name TEXT NOT NULL,
       price TEXT NOT NULL,
       icon TEXT NOT NULL,
+      image TEXT NOT NULL DEFAULT '',
       color TEXT NOT NULL,
       category TEXT NOT NULL,
       description TEXT NOT NULL,
@@ -36,6 +37,7 @@ export async function initializeShopDatabase(database: SQLiteDatabase) {
   );
   const existingColumns = new Set(columns.map((column) => column.name));
   for (const [name, definition] of [
+    ["image", "TEXT NOT NULL DEFAULT ''"],
     ["package_contents", "TEXT NOT NULL DEFAULT ''"],
     ["warranty", "TEXT NOT NULL DEFAULT ''"],
     ["shipping_info", "TEXT NOT NULL DEFAULT ''"],
@@ -66,6 +68,7 @@ export async function initializeShopDatabase(database: SQLiteDatabase) {
       product.name,
       product.price,
       product.icon,
+      product.image ?? "",
       product.color,
       product.category,
       product.description,
@@ -87,7 +90,7 @@ export async function initializeShopDatabase(database: SQLiteDatabase) {
 
     await database.runAsync(
       `INSERT OR IGNORE INTO products (
-        sku, name, price, icon, color, category, description, origin,
+        sku, name, price, icon, image, color, category, description, origin,
         material, dimensions, weight, stock, rating, review_count,
         care_instructions, package_contents, warranty, shipping_info,
         usage, tags, is_featured
@@ -96,7 +99,7 @@ export async function initializeShopDatabase(database: SQLiteDatabase) {
     );
     await database.runAsync(
       `UPDATE products SET
-        name = ?, price = ?, icon = ?, color = ?, category = ?, description = ?,
+        name = ?, price = ?, icon = ?, image = ?, color = ?, category = ?, description = ?,
         origin = ?, material = ?, dimensions = ?, weight = ?, stock = ?,
         rating = ?, review_count = ?, care_instructions = ?, package_contents = ?,
         warranty = ?, shipping_info = ?, usage = ?, tags = ?, is_featured = ?
@@ -104,6 +107,7 @@ export async function initializeShopDatabase(database: SQLiteDatabase) {
       product.name,
       product.price,
       product.icon,
+      product.image ?? "",
       product.color,
       product.category,
       product.description,
@@ -131,7 +135,7 @@ export async function getProducts(
 ): Promise<Product[]> {
   const rows = await database.getAllAsync<Product & { tags: string }>(
     `SELECT
-      id, sku, name, price, icon, color, category, description, origin,
+      id, sku, name, price, icon, image, color, category, description, origin,
       material, dimensions, weight, stock, rating, review_count AS reviewCount,
       care_instructions AS careInstructions,
       package_contents AS packageContents, warranty,

@@ -11,6 +11,7 @@ export type Product = {
   id?: number;
   sku: string;
   icon: string;
+  image?: string;
   name: string;
   price: string;
   color: string;
@@ -32,6 +33,15 @@ export type Product = {
   isFeatured: number;
 };
 
+const PRODUCT_IMAGE_POOL = [
+  "https://images.unsplash.com/photo-1556228720-195a672e8a03?auto=format&fit=crop&w=900&q=80",
+  "https://images.unsplash.com/photo-1523170335258-fef16a32d017?auto=format&fit=crop&w=900&q=80",
+  "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=900&q=80",
+  "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=900&q=80",
+  "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=900&q=80",
+  "https://images.unsplash.com/photo-1618220179428-22790b461013?auto=format&fit=crop&w=900&q=80",
+];
+
 export const SHOP_LOGO_URL =
   "https://www.bing.com/th/id/OIP.sbV5afV6wlWHw2E70tqUZAHaJ4?w=193&h=257&c=8&rs=1&qlt=90&o=6&dpr=1.3&pid=ImgAns&rm=2";
 
@@ -49,6 +59,7 @@ const BASE_PRODUCTS: Product[] = [
   {
     sku: "EIKO-001",
     icon: "👜",
+    image: PRODUCT_IMAGE_POOL[0],
     name: "Túi cói Hội An",
     price: "189.000đ",
     color: "#f6d6a4",
@@ -74,6 +85,7 @@ const BASE_PRODUCTS: Product[] = [
   {
     sku: "EIKO-002",
     icon: "👘",
+    image: PRODUCT_IMAGE_POOL[1],
     name: "Áo dài mini Huế",
     price: "329.000đ",
     color: "#d9c4ff",
@@ -99,6 +111,7 @@ const BASE_PRODUCTS: Product[] = [
   {
     sku: "EIKO-003",
     icon: "🏺",
+    image: PRODUCT_IMAGE_POOL[2],
     name: "Bình gốm Bát Tràng",
     price: "275.000đ",
     color: "#bce5dc",
@@ -123,6 +136,7 @@ const BASE_PRODUCTS: Product[] = [
   {
     sku: "EIKO-004",
     icon: "🔑",
+    image: PRODUCT_IMAGE_POOL[3],
     name: "Móc khóa Việt Nam",
     price: "59.000đ",
     color: "#ffd2de",
@@ -147,6 +161,7 @@ const BASE_PRODUCTS: Product[] = [
   {
     sku: "EIKO-005",
     icon: "🎋",
+    image: PRODUCT_IMAGE_POOL[4],
     name: "Tranh treo Đông Hồ",
     price: "215.000đ",
     color: "#f8e0ac",
@@ -289,6 +304,7 @@ function createSeedProduct(
   return {
     sku: `EIKO-${String(BASE_PRODUCTS.length + index + 1).padStart(3, "0")}`,
     icon,
+    image: PRODUCT_IMAGE_POOL[index % PRODUCT_IMAGE_POOL.length],
     name,
     price,
     color,

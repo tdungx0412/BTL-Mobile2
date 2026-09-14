@@ -39,10 +39,36 @@ export function ShopHomeContent({
   onOpenCart,
 }: ShopHomeContentProps) {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const normalizedSearch = search.trim().toLowerCase();
+
+  const suggestedProducts = products
+    .filter((product) => {
+      if (!normalizedSearch) return false;
+      return product.name.toLowerCase().includes(normalizedSearch);
+    })
+    .slice(0, 4);
+
   const visibleProducts = products.filter((product) => {
-    const matchesSearch = product.name
-      .toLowerCase()
-      .includes(search.toLowerCase());
+    const searchTarget = [
+      product.name,
+      product.category,
+      product.description,
+      product.origin,
+      product.material,
+      product.dimensions,
+      product.weight,
+      product.usage,
+      product.careInstructions,
+      product.packageContents ?? "",
+      product.shippingInfo ?? "",
+      product.warranty ?? "",
+      product.tags.join(" "),
+    ]
+      .join(" ")
+      .toLowerCase();
+
+    const matchesSearch =
+      !normalizedSearch || searchTarget.includes(normalizedSearch);
     const matchesCategory =
       !selectedCategory || product.category === selectedCategory;
     return matchesSearch && matchesCategory;
@@ -95,14 +121,59 @@ export function ShopHomeContent({
               placeholderTextColor="#667085"
               style={styles.searchInput}
               returnKeyType="search"
+              autoCapitalize="none"
+              autoCorrect={false}
             />
+            {search.length > 0 && (
+              <Pressable
+                style={styles.searchClearButton}
+                onPress={() => onSearchChange("")}
+                accessibilityLabel="Xóa tìm kiếm"
+              >
+                <Ionicons name="close-circle" size={18} color="#667085" />
+              </Pressable>
+            )}
             <Pressable
               style={styles.searchButton}
               accessibilityLabel="Tìm kiếm"
+              onPress={() => {}}
             >
               <Ionicons name="search" size={21} color="#172b4d" />
             </Pressable>
           </View>
+          {normalizedSearch.length > 0 && suggestedProducts.length > 0 && (
+            <View style={styles.searchSuggestionList}>
+              {suggestedProducts.map((product) => (
+                <Pressable
+                  key={product.sku}
+                  style={styles.searchSuggestionItem}
+                  onPress={() => {
+                    onSearchChange(product.name);
+                    setSelectedCategory(null);
+                  }}
+                >
+                  <View style={styles.searchSuggestionThumb}>
+                    {product.image ? (
+                      <Image
+                        source={{ uri: product.image }}
+                        style={styles.searchSuggestionImage}
+                        contentFit="cover"
+                        accessibilityLabel={product.name}
+                      />
+                    ) : (
+                      <ThemedText style={styles.searchSuggestionEmoji}>
+                        {product.icon}
+                      </ThemedText>
+                    )}
+                  </View>
+                  <ThemedText style={styles.searchSuggestionName}>
+                    {product.name}
+                  </ThemedText>
+                  <Ionicons name="arrow-forward" size={15} color="#7142a5" />
+                </Pressable>
+              ))}
+            </View>
+          )}
           <Pressable style={styles.locationPill} onPress={onOpenLocation}>
             <Ionicons name="location-outline" size={17} color="#fff" />
             <ThemedText style={styles.locationText}>
@@ -270,7 +341,16 @@ function ProductCard({
           { backgroundColor: product.color },
         ]}
       >
-        <ThemedText style={styles.productEmoji}>{product.icon}</ThemedText>
+        {product.image ? (
+          <Image
+            source={{ uri: product.image }}
+            style={styles.productImageObject}
+            contentFit="cover"
+            accessibilityLabel={product.name}
+          />
+        ) : (
+          <ThemedText style={styles.productEmoji}>{product.icon}</ThemedText>
+        )}
         <Pressable
           style={styles.heart}
           onPress={(event) => {

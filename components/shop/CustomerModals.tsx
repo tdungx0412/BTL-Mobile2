@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import { Modal, Pressable, ScrollView, View } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
@@ -34,9 +35,18 @@ export function ProductModal({
               <View
                 style={[styles.detailImage, { backgroundColor: product.color }]}
               >
-                <ThemedText style={styles.detailEmoji}>
-                  {product.icon}
-                </ThemedText>
+                {product.image ? (
+                  <Image
+                    source={{ uri: product.image }}
+                    style={styles.productImageObject}
+                    contentFit="cover"
+                    accessibilityLabel={product.name}
+                  />
+                ) : (
+                  <ThemedText style={styles.detailEmoji}>
+                    {product.icon}
+                  </ThemedText>
+                )}
                 <Pressable
                   style={styles.detailClose}
                   onPress={onClose}
@@ -208,9 +218,18 @@ export function CartModal({
                   <View
                     style={[styles.cartThumb, { backgroundColor: item.color }]}
                   >
-                    <ThemedText style={styles.cartEmoji}>
-                      {item.icon}
-                    </ThemedText>
+                    {item.image ? (
+                      <Image
+                        source={{ uri: item.image }}
+                        style={styles.productImageObject}
+                        contentFit="cover"
+                        accessibilityLabel={item.name}
+                      />
+                    ) : (
+                      <ThemedText style={styles.cartEmoji}>
+                        {item.icon}
+                      </ThemedText>
+                    )}
                   </View>
                   <View style={styles.cartCopy}>
                     <ThemedText style={styles.cartName}>{item.name}</ThemedText>

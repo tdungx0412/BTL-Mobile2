@@ -2,10 +2,10 @@ import { useState } from "react";
 import { StyleSheet } from "react-native";
 
 import {
-  CartModal,
-  LocationModal,
-  ProductModal,
-  ShopHomeContent,
+    CartModal,
+    LocationModal,
+    ProductModal,
+    ShopHomeContent,
 } from "@/components/shop";
 import { ThemedView } from "@/components/themed-view";
 import type { Product } from "@/constants/shop-data";
@@ -16,13 +16,14 @@ export default function HomeScreen() {
   const [selectedProvince, setSelectedProvince] = useState("Hà Nội");
   const [isMenuVisible, setIsMenuVisible] = useState(false);
   const [search, setSearch] = useState("");
+  const [provinceSearch, setProvinceSearch] = useState("");
   const [favoriteNames, setFavoriteNames] = useState<Set<string>>(new Set());
   const [cartItems, setCartItems] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isCartVisible, setIsCartVisible] = useState(false);
 
   const openLocationMenu = () => {
-    setSearch("");
+    setProvinceSearch("");
     setIsMenuVisible(true);
   };
 
@@ -67,9 +68,9 @@ export default function HomeScreen() {
       />
       <LocationModal
         visible={isMenuVisible}
-        search={search}
+        search={provinceSearch}
         selectedProvince={selectedProvince}
-        onSearchChange={setSearch}
+        onSearchChange={setProvinceSearch}
         onClose={closeLocationMenu}
         onSelect={selectProvince}
       />

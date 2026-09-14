@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import { Pressable, ScrollView, View } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
@@ -36,6 +37,8 @@ export function CustomerExplore() {
           {
             sku: "EIKO-004",
             icon: "🔑",
+            image:
+              "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=900&q=80",
             name: "Móc khóa Việt Nam",
             price: "59.000đ",
             color: "#ffd2de",
@@ -55,6 +58,8 @@ export function CustomerExplore() {
           {
             sku: "EIKO-005",
             icon: "🎋",
+            image:
+              "https://images.unsplash.com/photo-1523170335258-fef16a32d017?auto=format&fit=crop&w=900&q=80",
             name: "Tranh treo Đông Hồ",
             price: "215.000đ",
             color: "#f8e0ac",
@@ -77,9 +82,18 @@ export function CustomerExplore() {
             <View
               style={[styles.exploreImage, { backgroundColor: product.color }]}
             >
-              <ThemedText style={styles.exploreEmoji}>
-                {product.icon}
-              </ThemedText>
+              {product.image ? (
+                <Image
+                  source={{ uri: product.image }}
+                  style={styles.productImageObject}
+                  contentFit="cover"
+                  accessibilityLabel={product.name}
+                />
+              ) : (
+                <ThemedText style={styles.exploreEmoji}>
+                  {product.icon}
+                </ThemedText>
+              )}
               <View style={styles.exploreHeart}>
                 <Ionicons name="heart-outline" size={17} color="#7142a5" />
               </View>
