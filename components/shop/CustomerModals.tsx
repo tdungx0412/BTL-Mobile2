@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
-import { Modal, Pressable, ScrollView, View } from "react-native";
+import { Modal, Pressable, ScrollView, TextInput, View } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
 import type { Product } from "@/constants/shop-data";
@@ -31,7 +31,11 @@ export function ProductModal({
       {product && (
         <View style={styles.modalBackdrop}>
           <View style={styles.productModal}>
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              alwaysBounceVertical={true}
+              contentContainerStyle={styles.detailScrollContent}
+            >
               <View
                 style={[styles.detailImage, { backgroundColor: product.color }]}
               >
@@ -167,6 +171,7 @@ type CartModalProps = {
   items: Product[];
   onClose: () => void;
   onRemove: (name: string) => void;
+  onCheckout: () => void;
 };
 
 export function CartModal({
@@ -174,6 +179,7 @@ export function CartModal({
   items,
   onClose,
   onRemove,
+  onCheckout,
 }: CartModalProps) {
   return (
     <Modal
@@ -258,7 +264,7 @@ export function CartModal({
                   đ
                 </ThemedText>
               </View>
-              <Pressable style={styles.checkoutButton}>
+              <Pressable style={styles.checkoutButton} onPress={onCheckout}>
                 <ThemedText style={styles.addButtonText}>
                   Tiến hành đặt hàng
                 </ThemedText>
@@ -266,6 +272,135 @@ export function CartModal({
               </Pressable>
             </>
           )}
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+type CheckoutModalProps = {
+  visible: boolean;
+  items: Product[];
+  selectedProvince: string;
+  onClose: () => void;
+  onConfirm: () => void;
+};
+
+export function CheckoutModal({
+  visible,
+  items,
+  selectedProvince,
+  onClose,
+  onConfirm,
+}: CheckoutModalProps) {
+  const total = items.reduce(
+    (sum, item) => sum + Number(item.price.replace(/\D/g, "")),
+    0,
+  );
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+    >
+      <View style={styles.modalBackdrop}>
+        <View style={styles.checkoutModal}>
+          <View style={styles.modalHeader}>
+            <View>
+              <ThemedText style={styles.modalTitle}>Thanh toán</ThemedText>
+              <ThemedText style={styles.countText}>
+                {items.length} sản phẩm cần thanh toán
+              </ThemedText>
+            </View>
+            <Pressable
+              style={styles.closeButton}
+              onPress={onClose}
+              accessibilityLabel="Đóng thanh toán"
+            >
+              <Ionicons name="close" size={21} color="#54316d" />
+            </Pressable>
+          </View>
+
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <View style={styles.checkoutSummaryCard}>
+              <View style={styles.checkoutSummaryRow}>
+                <ThemedText style={styles.checkoutLabel}>Người nhận</ThemedText>
+                <ThemedText style={styles.checkoutValue}>
+                  Khách hàng EiKo
+                </ThemedText>
+              </View>
+              <View style={styles.checkoutSummaryRow}>
+                <ThemedText style={styles.checkoutLabel}>Giao đến</ThemedText>
+                <ThemedText style={styles.checkoutValue}>
+                  {selectedProvince}
+                </ThemedText>
+              </View>
+              <View style={styles.checkoutSummaryRow}>
+                <ThemedText style={styles.checkoutLabel}>
+                  Phương thức
+                </ThemedText>
+                <ThemedText style={styles.checkoutValue}>Giao hàng</ThemedText>
+              </View>
+            </View>
+
+            <View style={styles.checkoutAddressBox}>
+              <ThemedText style={styles.checkoutSectionTitle}>
+                Địa chỉ nhận hàng
+              </ThemedText>
+              <TextInput
+                style={styles.checkoutInput}
+                value="Số 25, Đường Láng, Đống Đa, Hà Nội"
+                editable={false}
+              />
+            </View>
+
+            <View style={styles.checkoutAddressBox}>
+              <ThemedText style={styles.checkoutSectionTitle}>
+                Phương thức thanh toán
+              </ThemedText>
+              <View style={styles.checkoutMethodRow}>
+                <Ionicons name="card-outline" size={20} color="#7142a5" />
+                <ThemedText style={styles.checkoutMethodText}>
+                  Thanh toán khi nhận hàng
+                </ThemedText>
+              </View>
+              <View style={styles.checkoutMethodRow}>
+                <Ionicons name="wallet-outline" size={20} color="#7142a5" />
+                <ThemedText style={styles.checkoutMethodText}>
+                  Ví điện tử EiKo
+                </ThemedText>
+              </View>
+            </View>
+
+            <View style={styles.checkoutTotalBox}>
+              <ThemedText style={styles.checkoutSectionTitle}>
+                Tổng cộng
+              </ThemedText>
+              <View style={styles.checkoutSummaryRow}>
+                <ThemedText style={styles.checkoutLabel}>Tạm tính</ThemedText>
+                <ThemedText style={styles.totalPrice}>
+                  {total.toLocaleString("vi-VN")}đ
+                </ThemedText>
+              </View>
+              <View style={styles.checkoutSummaryRow}>
+                <ThemedText style={styles.checkoutLabel}>Phí ship</ThemedText>
+                <ThemedText style={styles.checkoutValue}>Miễn phí</ThemedText>
+              </View>
+              <View style={styles.checkoutSummaryRow}>
+                <ThemedText style={styles.checkoutLabel}>Thành tiền</ThemedText>
+                <ThemedText style={styles.totalPrice}>
+                  {total.toLocaleString("vi-VN")}đ
+                </ThemedText>
+              </View>
+            </View>
+
+            <Pressable style={styles.checkoutConfirmButton} onPress={onConfirm}>
+              <ThemedText style={styles.addButtonText}>Đặt hàng</ThemedText>
+              <Ionicons name="arrow-forward" size={18} color="#fff" />
+            </Pressable>
+          </ScrollView>
         </View>
       </View>
     </Modal>

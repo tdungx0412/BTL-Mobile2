@@ -3,6 +3,7 @@ import { StyleSheet } from "react-native";
 
 import {
     CartModal,
+    CheckoutModal,
     LocationModal,
     ProductModal,
     ShopHomeContent,
@@ -21,6 +22,7 @@ export default function HomeScreen() {
   const [cartItems, setCartItems] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isCartVisible, setIsCartVisible] = useState(false);
+  const [isCheckoutVisible, setIsCheckoutVisible] = useState(false);
 
   const openLocationMenu = () => {
     setProvinceSearch("");
@@ -94,6 +96,20 @@ export default function HomeScreen() {
             current.filter((item) => item.name !== name),
           )
         }
+        onCheckout={() => {
+          setIsCartVisible(false);
+          setIsCheckoutVisible(true);
+        }}
+      />
+      <CheckoutModal
+        visible={isCheckoutVisible}
+        items={cartItems}
+        selectedProvince={selectedProvince}
+        onClose={() => setIsCheckoutVisible(false)}
+        onConfirm={() => {
+          setIsCheckoutVisible(false);
+          setCartItems([]);
+        }}
       />
     </ThemedView>
   );

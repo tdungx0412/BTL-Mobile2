@@ -33,52 +33,11 @@ export function CustomerExplore() {
       </View>
 
       <View style={styles.exploreGrid}>
-        {PRODUCTS.concat([
-          {
-            sku: "EIKO-004",
-            icon: "🔑",
-            image:
-              "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=900&q=80",
-            name: "Móc khóa Việt Nam",
-            price: "59.000đ",
-            color: "#ffd2de",
-            category: "Quà tặng",
-            description: "Móc khóa gỗ nhỏ gọn, khắc hình bản đồ Việt Nam.",
-            origin: "Xưởng mộc Đồng Kỵ, Bắc Ninh",
-            material: "Gỗ beech, khoen thép không gỉ",
-            dimensions: "6 x 3.5 x 0.8 cm",
-            weight: "35 g",
-            stock: 62,
-            rating: 4.6,
-            reviewCount: 318,
-            careInstructions: "Tránh tiếp xúc lâu với nước.",
-            tags: ["gỗ", "Việt Nam"],
-            isFeatured: 0,
-          },
-          {
-            sku: "EIKO-005",
-            icon: "🎋",
-            image:
-              "https://images.unsplash.com/photo-1523170335258-fef16a32d017?auto=format&fit=crop&w=900&q=80",
-            name: "Tranh treo Đông Hồ",
-            price: "215.000đ",
-            color: "#f8e0ac",
-            category: "Trang trí",
-            description:
-              "Tranh in thủ công lấy cảm hứng từ dòng tranh Đông Hồ.",
-            origin: "Làng tranh Đông Hồ, Bắc Ninh",
-            material: "Giấy điệp, khung gỗ thông",
-            dimensions: "25 x 35 cm",
-            weight: "360 g",
-            stock: 19,
-            rating: 4.8,
-            reviewCount: 97,
-            careInstructions: "Tránh ánh nắng trực tiếp.",
-            tags: ["trang trí", "Đông Hồ"],
-            isFeatured: 0,
-          },
-        ]).map((product) => (
-          <Pressable key={product.name} style={styles.exploreCard}>
+        {PRODUCTS.map((product) => (
+          <Pressable
+            key={product.sku ?? product.name}
+            style={styles.exploreCard}
+          >
             <View
               style={[styles.exploreImage, { backgroundColor: product.color }]}
             >
@@ -126,6 +85,39 @@ export function CustomerExplore() {
 }
 
 export function CustomerAccount() {
+  const accountMenus = [
+    {
+      icon: "receipt-outline",
+      title: "Đơn hàng của tôi",
+      description: "Theo dõi đơn hàng và lịch sử mua sắm",
+      badge: "03",
+    },
+    {
+      icon: "heart-outline",
+      title: "Sản phẩm yêu thích",
+      description: "Lưu lại những món quà bạn thích",
+      badge: "12",
+    },
+    {
+      icon: "location-outline",
+      title: "Sổ địa chỉ",
+      description: "Quản lý địa chỉ nhận hàng",
+      badge: "02",
+    },
+    {
+      icon: "notifications-outline",
+      title: "Thông báo",
+      description: "Cập nhật ưu đãi mới nhất từ EiKo",
+      badge: "05",
+    },
+  ];
+
+  const accountMetrics = [
+    { label: "Đơn hàng", value: "03" },
+    { label: "Yêu thích", value: "12" },
+    { label: "Điểm EiKo", value: "980" },
+  ];
+
   return (
     <ScrollView
       style={styles.customerScreen}
@@ -136,52 +128,69 @@ export function CustomerAccount() {
       <ThemedText type="title" style={styles.pageTitle}>
         Xin chào bạn!
       </ThemedText>
-      <View style={styles.accountCard}>
+
+      <View style={styles.accountProfileCard}>
         <View style={styles.accountAvatar}>
           <Ionicons name="person" size={28} color="#7142a5" />
         </View>
+
         <View style={styles.accountCopy}>
           <ThemedText style={styles.accountTitle}>Khách hàng EiKo</ThemedText>
           <ThemedText style={styles.accountText}>
-            Đăng nhập để quản lý đơn hàng
+            khoidev@eiko.vn • Thành viên vàng
           </ThemedText>
+          <View style={styles.accountMetaRow}>
+            <Ionicons name="shield-checkmark" size={12} color="#7142a5" />
+            <ThemedText style={styles.accountMetaText}>
+              Tài khoản đã xác thực
+            </ThemedText>
+          </View>
         </View>
-        <Ionicons name="chevron-forward" size={20} color="#7142a5" />
+
+        <Pressable style={styles.accountArrowButton}>
+          <Ionicons name="chevron-forward" size={20} color="#7142a5" />
+        </Pressable>
       </View>
+
+      <View style={styles.accountMetricsGrid}>
+        {accountMetrics.map((metric) => (
+          <View key={metric.label} style={styles.accountMetricCard}>
+            <ThemedText style={styles.accountMetricValue}>
+              {metric.value}
+            </ThemedText>
+            <ThemedText style={styles.accountMetricLabel}>
+              {metric.label}
+            </ThemedText>
+          </View>
+        ))}
+      </View>
+
       <ThemedText style={styles.subsectionTitle}>Quản lý mua sắm</ThemedText>
-      {[
-        [
-          "receipt-outline",
-          "Đơn hàng của tôi",
-          "Theo dõi đơn hàng và lịch sử mua sắm",
-        ],
-        [
-          "heart-outline",
-          "Sản phẩm yêu thích",
-          "Lưu lại những món quà bạn thích",
-        ],
-        ["location-outline", "Sổ địa chỉ", "Quản lý địa chỉ nhận hàng"],
-        [
-          "notifications-outline",
-          "Thông báo",
-          "Cập nhật ưu đãi mới nhất từ EiKo",
-        ],
-      ].map(([icon, title, description]) => (
-        <Pressable key={title} style={styles.accountRow}>
+      {accountMenus.map((item) => (
+        <Pressable key={item.title} style={styles.accountRow}>
           <View style={styles.accountIcon}>
             <Ionicons
-              name={icon as keyof typeof Ionicons.glyphMap}
+              name={item.icon as keyof typeof Ionicons.glyphMap}
               size={20}
               color="#7142a5"
             />
           </View>
           <View style={styles.accountRowCopy}>
-            <ThemedText style={styles.accountRowTitle}>{title}</ThemedText>
-            <ThemedText style={styles.accountRowText}>{description}</ThemedText>
+            <ThemedText style={styles.accountRowTitle}>{item.title}</ThemedText>
+            <ThemedText style={styles.accountRowText}>
+              {item.description}
+            </ThemedText>
+          </View>
+          <View style={styles.accountRowBadge}>
+            <ThemedText style={styles.accountRowBadgeText}>
+              {item.badge}
+            </ThemedText>
           </View>
           <Ionicons name="chevron-forward" size={18} color="#aa9ab8" />
         </Pressable>
       ))}
+
+      <ThemedText style={styles.subsectionTitle}>Hỗ trợ & chăm sóc</ThemedText>
       <View style={styles.helpCard}>
         <Ionicons
           name="chatbubble-ellipses-outline"
@@ -196,7 +205,15 @@ export function CustomerAccount() {
             Đội ngũ EiKo luôn sẵn sàng lắng nghe
           </ThemedText>
         </View>
+        <Ionicons name="chevron-forward" size={18} color="#aa9ab8" />
       </View>
+
+      <Pressable style={styles.accountPrimaryButton}>
+        <Ionicons name="power-outline" size={18} color="#fff" />
+        <ThemedText style={styles.accountPrimaryButtonText}>
+          Đăng xuất
+        </ThemedText>
+      </Pressable>
     </ScrollView>
   );
 }

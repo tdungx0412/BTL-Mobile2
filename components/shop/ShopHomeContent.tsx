@@ -174,26 +174,6 @@ export function ShopHomeContent({
               ))}
             </View>
           )}
-          <Pressable style={styles.locationPill} onPress={onOpenLocation}>
-            <Ionicons name="location-outline" size={17} color="#fff" />
-            <ThemedText style={styles.locationText}>
-              Giao đến{" "}
-              <ThemedText style={styles.locationStrong}>
-                {selectedProvince}
-              </ThemedText>
-            </ThemedText>
-            <Ionicons name="chevron-down" size={14} color="#fff" />
-          </Pressable>
-        </View>
-        <View style={styles.quickLinks}>
-          <Pressable onPress={() => setSelectedCategory(null)}>
-            <ThemedText style={styles.quickLinkActive}>Tất cả</ThemedText>
-          </Pressable>
-          {["Tết", "Giáng sinh", "Halloween", "Sinh nhật"].map((event) => (
-            <Pressable key={event} onPress={() => setSelectedCategory(event)}>
-              <ThemedText style={styles.quickLink}>{event}</ThemedText>
-            </Pressable>
-          ))}
         </View>
         <View style={styles.hero}>
           <View style={styles.heroCopy}>
@@ -267,7 +247,7 @@ export function ShopHomeContent({
                 >
                   {categoryProducts.slice(0, 4).map((product) => (
                     <ProductCard
-                      key={product.sku}
+                      key={product.sku ?? product.name}
                       product={product}
                       compact
                       isFavorite={favoriteNames.has(product.name)}
@@ -286,7 +266,7 @@ export function ShopHomeContent({
         <View style={styles.productGrid}>
           {visibleProducts.map((product) => (
             <ProductCard
-              key={product.name}
+              key={product.sku ?? product.name}
               product={product}
               isFavorite={favoriteNames.has(product.name)}
               onToggleFavorite={onToggleFavorite}
