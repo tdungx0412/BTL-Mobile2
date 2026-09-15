@@ -298,11 +298,12 @@ function createSeedProduct(
   category: string,
   index: number,
   seed: ProductSeed,
+  sku: string,
 ): Product {
   const [name, icon, price, color] = seed;
   const region = `Xưởng quà tặng ${category} Việt Nam`;
   return {
-    sku: `EIKO-${String(BASE_PRODUCTS.length + index + 1).padStart(3, "0")}`,
+    sku,
     icon,
     image: PRODUCT_IMAGE_POOL[index % PRODUCT_IMAGE_POOL.length],
     name,
@@ -327,9 +328,19 @@ function createSeedProduct(
   };
 }
 
-export const PRODUCTS: Product[] = [
-  ...BASE_PRODUCTS,
-  ...Object.entries(CATEGORY_SEEDS).flatMap(([category, seeds]) =>
-    seeds.map((seed, index) => createSeedProduct(category, index, seed)),
-  ),
-];
+export const PRODUCTS: Product[] = (() => {
+  let counter = BASE_PRODUCTS.length;
+  return [
+    ...BASE_PRODUCTS,
+    ...Object.entries(CATEGORY_SEEDS).flatMap(([category, seeds]) =>
+      seeds.map((seed, index) =>
+        createSeedProduct(
+          category,
+          index,
+          seed,
+          `EIKO-${String(++counter).padStart(3, "0")}`,
+        ),
+      ),
+    ),
+  ];
+})();

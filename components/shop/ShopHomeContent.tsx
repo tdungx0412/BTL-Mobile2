@@ -2,11 +2,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useState } from "react";
 import {
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    TextInput,
-    View,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  TextInput,
+  View,
 } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
@@ -143,35 +143,40 @@ export function ShopHomeContent({
           </View>
           {normalizedSearch.length > 0 && suggestedProducts.length > 0 && (
             <View style={styles.searchSuggestionList}>
-              {suggestedProducts.map((product) => (
-                <Pressable
-                  key={product.sku}
-                  style={styles.searchSuggestionItem}
-                  onPress={() => {
-                    onSearchChange(product.name);
-                    setSelectedCategory(null);
-                  }}
-                >
-                  <View style={styles.searchSuggestionThumb}>
-                    {product.image ? (
-                      <Image
-                        source={{ uri: product.image }}
-                        style={styles.searchSuggestionImage}
-                        contentFit="cover"
-                        accessibilityLabel={product.name}
-                      />
-                    ) : (
-                      <ThemedText style={styles.searchSuggestionEmoji}>
-                        {product.icon}
-                      </ThemedText>
-                    )}
-                  </View>
-                  <ThemedText style={styles.searchSuggestionName}>
-                    {product.name}
-                  </ThemedText>
-                  <Ionicons name="arrow-forward" size={15} color="#7142a5" />
-                </Pressable>
-              ))}
+              {suggestedProducts.map(
+                (
+                  product,
+                  index, // ← ĐÃ SỬA: thêm index
+                ) => (
+                  <Pressable
+                    key={`${product.sku ?? product.name}-${index}`} // ← ĐÃ SỬA: key unique
+                    style={styles.searchSuggestionItem}
+                    onPress={() => {
+                      onSearchChange(product.name);
+                      setSelectedCategory(null);
+                    }}
+                  >
+                    <View style={styles.searchSuggestionThumb}>
+                      {product.image ? (
+                        <Image
+                          source={{ uri: product.image }}
+                          style={styles.searchSuggestionImage}
+                          contentFit="cover"
+                          accessibilityLabel={product.name}
+                        />
+                      ) : (
+                        <ThemedText style={styles.searchSuggestionEmoji}>
+                          {product.icon}
+                        </ThemedText>
+                      )}
+                    </View>
+                    <ThemedText style={styles.searchSuggestionName}>
+                      {product.name}
+                    </ThemedText>
+                    <Ionicons name="arrow-forward" size={15} color="#7142a5" />
+                  </Pressable>
+                ),
+              )}
             </View>
           )}
         </View>
@@ -194,7 +199,7 @@ export function ShopHomeContent({
           </View>
           <View style={styles.heroArt}>
             <View style={styles.heroSun} />
-            <ThemedText style={styles.lantern}>🏮</ThemedText>
+            <ThemedText style={styles.lantern}></ThemedText>
           </View>
         </View>
         <SectionHeader
@@ -245,16 +250,21 @@ export function ShopHomeContent({
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.shelfProductList}
                 >
-                  {categoryProducts.slice(0, 4).map((product) => (
-                    <ProductCard
-                      key={product.sku ?? product.name}
-                      product={product}
-                      compact
-                      isFavorite={favoriteNames.has(product.name)}
-                      onToggleFavorite={onToggleFavorite}
-                      onSelectProduct={onSelectProduct}
-                    />
-                  ))}
+                  {categoryProducts.slice(0, 4).map(
+                    (
+                      product,
+                      index, // ← ĐÃ SỬA: thêm index
+                    ) => (
+                      <ProductCard
+                        key={`${product.sku ?? product.name}-${index}`} // ← ĐÃ SỬA: key unique
+                        product={product}
+                        compact
+                        isFavorite={favoriteNames.has(product.name)}
+                        onToggleFavorite={onToggleFavorite}
+                        onSelectProduct={onSelectProduct}
+                      />
+                    ),
+                  )}
                 </ScrollView>
               </View>
             );
@@ -264,15 +274,20 @@ export function ShopHomeContent({
           onSeeAll={() => setSelectedCategory(null)}
         />
         <View style={styles.productGrid}>
-          {visibleProducts.map((product) => (
-            <ProductCard
-              key={product.sku ?? product.name}
-              product={product}
-              isFavorite={favoriteNames.has(product.name)}
-              onToggleFavorite={onToggleFavorite}
-              onSelectProduct={onSelectProduct}
-            />
-          ))}
+          {visibleProducts.map(
+            (
+              product,
+              index, // ← ĐÃ SỬA: thêm index
+            ) => (
+              <ProductCard
+                key={`${product.sku ?? product.name}-${index}`} // ← ĐÃ SỬA: key unique
+                product={product}
+                isFavorite={favoriteNames.has(product.name)}
+                onToggleFavorite={onToggleFavorite}
+                onSelectProduct={onSelectProduct}
+              />
+            ),
+          )}
         </View>
         {search.length > 0 && visibleProducts.length === 0 && (
           <ThemedText style={styles.noResults}>
