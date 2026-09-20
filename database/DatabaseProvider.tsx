@@ -1,2 +1,3 @@
-export { DatabaseProvider } from "./DatabaseProvider.native";
-
+export function DatabaseProvider({ children }: { children: React.ReactNode }) {
+  return children;
+}

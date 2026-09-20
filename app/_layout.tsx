@@ -1,8 +1,5 @@
 import { Stack } from "expo-router";
-import { StatusBar } from "expo-status-bar";
 import "react-native-reanimated";
-
-import { DatabaseProvider } from "../database/DatabaseProvider";
 
 export const unstable_settings = {
   anchor: "(tabs)",
@@ -10,15 +7,12 @@ export const unstable_settings = {
 
 export default function RootLayout() {
   return (
-    <DatabaseProvider>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen
-          name="modal"
-          options={{ presentation: "modal", title: "Modal" }}
-        />
-      </Stack>
-      <StatusBar style="auto" />
-    </DatabaseProvider>
+    <Stack>
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen
+        name="modal"
+        options={{ presentation: "modal", title: "Modal" }}
+      />
+    </Stack>
   );
 }
