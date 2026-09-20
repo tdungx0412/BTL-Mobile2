@@ -27,13 +27,11 @@ app.get("/api/health", async (_req, res) => {
     const [rows] = await pool.query("SELECT 1 AS ok");
     res.json({ ok: true, database: rows[0]?.ok === 1 });
   } catch (error) {
-    res
-      .status(500)
-      .json({
-        ok: false,
-        message: "MySQL connection failed",
-        error: String(error),
-      });
+    res.status(500).json({
+      ok: false,
+      message: "MySQL connection failed",
+      error: String(error),
+    });
   }
 });
 
@@ -45,7 +43,7 @@ app.get("/api/products", async (_req, res) => {
         material, dimensions, weight, stock, rating, review_count AS reviewCount,
         care_instructions AS careInstructions,
         package_contents AS packageContents, warranty,
-        shipping_info AS shippingInfo, usage, tags,
+        shipping_info AS shippingInfo, \`usage\`, tags,
         is_featured AS isFeatured
       FROM products
       ORDER BY is_featured DESC, name ASC`,
@@ -62,6 +60,7 @@ app.get("/api/products", async (_req, res) => {
 
     res.json(products);
   } catch (error) {
+    console.error("Lỗi fetch products:", error);
     res
       .status(500)
       .json({ message: "Failed to fetch products", error: String(error) });
@@ -69,9 +68,10 @@ app.get("/api/products", async (_req, res) => {
 });
 
 app.get("/", (_req, res) => {
-  res.json({ message: "EIko Shop API is running" });
+  res.json({ message: "EIko Shop API - MySQL Connected ✅" });
 });
 
 app.listen(port, () => {
-  console.log(`API server running on http://localhost:${port}`);
+  console.log(`🚀 Server running on http://localhost:${port}`);
+  console.log(`📊 Health check: http://localhost:${port}/api/health`);
 });
