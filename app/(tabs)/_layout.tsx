@@ -25,15 +25,18 @@ export default function TabLayout() {
           ),
         }}
       />
+
+      {/* Tab Quản lý chính */}
       <Tabs.Screen
         name="explore"
         options={{
-          title: "Khám phá",
+          title: "Quản lý",
           tabBarIcon: ({ color }) => (
             <IconSymbol size={28} name="paperplane.fill" color={color} />
           ),
         }}
       />
+
       <Tabs.Screen
         name="account"
         options={{
