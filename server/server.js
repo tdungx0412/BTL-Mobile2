@@ -171,12 +171,12 @@ app.post("/api/products", async (req, res) => {
 // ✅ 3. API CẬP NHẬT SẢN PHẨM
 app.put("/api/products/:id", async (req, res) => {
   const { id } = req.params;
-  const { name, price, category, stock, description } = req.body;
+  const { name, price, category, stock, description, image } = req.body; // Thêm image
 
   try {
     const [result] = await pool.query(
-      `UPDATE products SET name=?, price=?, category=?, stock=?, description=? WHERE id=?`,
-      [name, price, category, Number(stock), description, id],
+      `UPDATE products SET name=?, price=?, category=?, stock=?, description=?, image=? WHERE id=?`, // Thêm image=?
+      [name, price, category, Number(stock), description, image || "", id], // Thêm image || ""
     );
 
     if (result.affectedRows === 0) {
@@ -185,7 +185,7 @@ app.put("/api/products/:id", async (req, res) => {
         .json({ message: "Không tìm thấy sản phẩm để cập nhật" });
     }
 
-    cache.flushAll(); // Xóa cache sau khi sửa
+    cache.flushAll();
     res.json({ message: "Cập nhật thành công" });
   } catch (error) {
     console.error("Lỗi sửa SP:", error);

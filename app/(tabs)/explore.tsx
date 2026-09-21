@@ -1,11 +1,13 @@
 // app/(tabs)/explore.tsx
 import { ThemedView } from "@/components/themed-view";
 import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker"; // <-- THÊM IMPORT NÀY
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Image, 
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -13,7 +15,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001/api";
@@ -27,6 +29,7 @@ interface ProductItem {
   stock: number;
   sku: string;
   description?: string;
+  image?: string; 
 }
 
 // Interface cho Nhân viên (Giả lập)
@@ -59,6 +62,7 @@ export default function ExploreScreen() {
     category: "",
     stock: "0",
     description: "",
+    image: "", 
   });
   const [submitting, setSubmitting] = useState(false);
 
@@ -128,6 +132,7 @@ export default function ExploreScreen() {
         category: product.category,
         stock: String(product.stock),
         description: product.description || "",
+        image: product.image || "",
       });
     } else {
       setEditingProduct(null);
@@ -137,9 +142,38 @@ export default function ExploreScreen() {
         category: "",
         stock: "0",
         description: "",
+        image: "",
       });
     }
     setModalVisible(true);
+  };
+
+  // --- HÀM CHỌN ẢNH TỪ THƯ VIỆN ---
+  const pickImage = async () => {
+    // Yêu cầu quyền truy cập
+    let permissionResult =
+      await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (permissionResult.granted === false) {
+      Alert.alert(
+        "Cần quyền truy cập",
+        "Vui lòng cấp quyền truy cập thư viện ảnh để tiếp tục.",
+      );
+      return;
+    }
+
+    // Mở bộ chọn ảnh
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.8,
+    });
+
+    if (!result.canceled) {
+      // Cập nhật state với đường dẫn ảnh cục bộ
+      setFormData({ ...formData, image: result.assets[0].uri });
+    }
   };
 
   const handleSubmitProduct = async () => {
@@ -153,6 +187,9 @@ export default function ExploreScreen() {
       const url = editingProduct
         ? `${API_URL}/products/${editingProduct.id}`
         : `${API_URL}/products`;
+
+      // Lưu ý: Nếu dùng ảnh cục bộ (file://), bạn cần upload lên server trước khi gửi JSON.
+      // Ở đây giả định bạn sẽ xử lý việc upload hoặc dùng URL public.
       const body = {
         ...formData,
         price: formData.price + ".000đ",
@@ -201,6 +238,13 @@ export default function ExploreScreen() {
       activeOpacity={0.9}
       onPress={() => openForm(item)}
     >
+      {/* Hiển thị ảnh nhỏ nếu có */}
+      {item.image ? (
+        <Image source={{ uri: item.image }} style={styles.productThumb} />
+      ) : (
+        <View style={[styles.productThumb, styles.placeholderImg]} />
+      )}
+
       <View style={styles.cardInfo}>
         <Text style={styles.name} numberOfLines={1}>
           {item.name}
@@ -395,7 +439,7 @@ export default function ExploreScreen() {
         />
       )}
 
-      {/* MODAL FORM SẢN PHẨM (Giữ nguyên như cũ) */}
+      {/* MODAL FORM SẢN PHẨM */}
       <Modal visible={modalVisible} animationType="slide" transparent>
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -410,6 +454,49 @@ export default function ExploreScreen() {
                 <Ionicons name="close" size={24} color="#666" />
               </TouchableOpacity>
             </View>
+
+            {/* Ô chọn ảnh */}
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Ảnh sản phẩm</Text>
+              <TouchableOpacity
+                style={[
+                  styles.textInput,
+                  {
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                  },
+                ]}
+                onPress={pickImage}
+              >
+                <Text
+                  style={{
+                    color: formData.image ? "#1f2937" : "#999",
+                    flex: 1,
+                  }}
+                >
+                  {formData.image ? "Đã chọn ảnh" : "Chọn ảnh từ thư viện..."}
+                </Text>
+                <Ionicons name="image-outline" size={20} color="#666" />
+              </TouchableOpacity>
+
+              {/* Xem trước ảnh */}
+              {formData.image ? (
+                <View style={{ marginTop: 10, alignItems: "center" }}>
+                  <Image
+                    source={{ uri: formData.image }}
+                    style={{
+                      width: 100,
+                      height: 100,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: "#e5e7eb",
+                    }}
+                  />
+                </View>
+              ) : null}
+            </View>
+
             <View style={styles.formGroup}>
               <Text style={styles.label}>Tên sản phẩm *</Text>
               <TextInput
@@ -550,6 +637,19 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 2,
+    alignItems: "center", // Căn giữa theo chiều dọc
+  },
+  productThumb: {
+    width: 50,
+    height: 50,
+    borderRadius: 8,
+    marginRight: 12,
+    backgroundColor: "#f3f4f6",
+  },
+  placeholderImg: {
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    borderStyle: "dashed",
   },
   cardInfo: { flex: 1, justifyContent: "center" },
   name: { fontSize: 16, fontWeight: "bold", color: "#1f2937", marginBottom: 4 },
