@@ -1,386 +1,320 @@
+// components/shop/ShopHomeContent.tsx
+import { CATEGORIES, SHOP_LOGO_URL } from "@/constants/shop-data"; // ✅ Import thêm SHOP_LOGO_URL
 import { Ionicons } from "@expo/vector-icons";
-import { Image } from "expo-image";
 import { useState } from "react";
 import {
-  Pressable,
-  SafeAreaView,
+  ActivityIndicator,
+  Dimensions,
+  FlatList,
+  Image,
   ScrollView,
+  StyleSheet,
+  Text,
   TextInput,
+  TouchableOpacity,
   View,
 } from "react-native";
+import { useShopProducts } from "../../hooks/useShopProducts";
+import ProductCard from "./ProductCard";
 
-import { ThemedText } from "@/components/themed-text";
-import { CATEGORIES, SHOP_LOGO_URL, type Product } from "@/constants/shop-data";
-import { styles } from "./shop-styles";
+const { width } = Dimensions.get("window");
+const COLUMN_COUNT = 2;
+const ITEM_WIDTH = (width - 40) / COLUMN_COUNT;
 
-type ShopHomeContentProps = {
-  products: Product[];
-  selectedProvince: string;
-  onOpenLocation: () => void;
-  search: string;
-  onSearchChange: (value: string) => void;
-  favoriteNames: Set<string>;
-  onToggleFavorite: (product: Product) => void;
-  onSelectProduct: (product: Product) => void;
-  cartCount: number;
-  onOpenCart: () => void;
-};
-
-export function ShopHomeContent({
-  products,
+export default function ShopHomeContent({
   selectedProvince,
   onOpenLocation,
-  search,
-  onSearchChange,
   favoriteNames,
   onToggleFavorite,
   onSelectProduct,
   cartCount,
   onOpenCart,
-}: ShopHomeContentProps) {
+}: any) {
+  const { products, loading, error } = useShopProducts();
+  const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const normalizedSearch = search.trim().toLowerCase();
 
-  const suggestedProducts = products
-    .filter((product) => {
-      if (!normalizedSearch) return false;
-      return product.name.toLowerCase().includes(normalizedSearch);
-    })
-    .slice(0, 4);
-
-  const visibleProducts = products.filter((product) => {
-    const searchTarget = [
-      product.name,
-      product.category,
-      product.description,
-      product.origin,
-      product.material,
-      product.dimensions,
-      product.weight,
-      product.usage,
-      product.careInstructions,
-      product.packageContents ?? "",
-      product.shippingInfo ?? "",
-      product.warranty ?? "",
-      product.tags.join(" "),
-    ]
-      .join(" ")
-      .toLowerCase();
-
-    const matchesSearch =
-      !normalizedSearch || searchTarget.includes(normalizedSearch);
-    const matchesCategory =
-      !selectedCategory || product.category === selectedCategory;
-    return matchesSearch && matchesCategory;
+  // Lọc sản phẩm theo search và category
+  const filteredProducts = products.filter((p) => {
+    const matchSearch = p.name
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase());
+    const matchCategory = selectedCategory
+      ? p.category === selectedCategory
+      : true;
+    return matchSearch && matchCategory;
   });
 
-  return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.content}
-      >
-        <View style={styles.amazonHeader}>
-          <View style={styles.headerTop}>
-            <View style={styles.shopHeader}>
-              <View style={styles.logo}>
-                <Image
-                  source={{ uri: SHOP_LOGO_URL }}
-                  style={styles.logoImage}
-                  contentFit="cover"
-                  accessibilityLabel="Logo EiKo"
-                />
-              </View>
-              <ThemedText style={styles.brand}>EiKo</ThemedText>
-            </View>
-            <Pressable
-              style={styles.accountButton}
-              accessibilityLabel="Tài khoản"
-            >
-              <Ionicons name="person-outline" size={22} color="#fff" />
-              <ThemedText style={styles.accountLabel}>Tài khoản</ThemedText>
-            </Pressable>
-            <Pressable
-              style={styles.cartButton}
-              onPress={onOpenCart}
-              accessibilityLabel="Giỏ hàng"
-            >
-              <Ionicons name="cart-outline" size={27} color="#fff" />
-              {cartCount > 0 && (
-                <View style={styles.badge}>
-                  <ThemedText style={styles.badgeText}>{cartCount}</ThemedText>
-                </View>
-              )}
-            </Pressable>
-          </View>
-          <View style={styles.searchBar}>
-            <TextInput
-              value={search}
-              onChangeText={onSearchChange}
-              placeholder="Tìm kiếm sản phẩm"
-              placeholderTextColor="#667085"
-              style={styles.searchInput}
-              returnKeyType="search"
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            {search.length > 0 && (
-              <Pressable
-                style={styles.searchClearButton}
-                onPress={() => onSearchChange("")}
-                accessibilityLabel="Xóa tìm kiếm"
-              >
-                <Ionicons name="close-circle" size={18} color="#667085" />
-              </Pressable>
-            )}
-            <Pressable
-              style={styles.searchButton}
-              accessibilityLabel="Tìm kiếm"
-              onPress={() => {}}
-            >
-              <Ionicons name="search" size={21} color="#172b4d" />
-            </Pressable>
-          </View>
-          {normalizedSearch.length > 0 && suggestedProducts.length > 0 && (
-            <View style={styles.searchSuggestionList}>
-              {suggestedProducts.map(
-                (
-                  product,
-                  index, // ← ĐÃ SỬA: thêm index
-                ) => (
-                  <Pressable
-                    key={`${product.sku ?? product.name}-${index}`} // ← ĐÃ SỬA: key unique
-                    style={styles.searchSuggestionItem}
-                    onPress={() => {
-                      onSearchChange(product.name);
-                      setSelectedCategory(null);
-                    }}
-                  >
-                    <View style={styles.searchSuggestionThumb}>
-                      {product.image ? (
-                        <Image
-                          source={{ uri: product.image }}
-                          style={styles.searchSuggestionImage}
-                          contentFit="cover"
-                          accessibilityLabel={product.name}
-                        />
-                      ) : (
-                        <ThemedText style={styles.searchSuggestionEmoji}>
-                          {product.icon}
-                        </ThemedText>
-                      )}
-                    </View>
-                    <ThemedText style={styles.searchSuggestionName}>
-                      {product.name}
-                    </ThemedText>
-                    <Ionicons name="arrow-forward" size={15} color="#7142a5" />
-                  </Pressable>
-                ),
-              )}
-            </View>
-          )}
+  // --- 1. PHẦN HEADER: LOGO + TÊN SHOP + ICONS ---
+  const renderBrandHeader = () => (
+    <View style={styles.brandContainer}>
+      <View style={styles.brandLeft}>
+        {/* Hiển thị Logo Shop */}
+        <Image source={{ uri: SHOP_LOGO_URL }} style={styles.logo} />
+        <View>
+          <Text style={styles.shopName}>EIko Shop</Text>
+          <Text style={styles.shopSlogan}>Quà tặng thủ công Việt Nam</Text>
         </View>
-        <View style={styles.hero}>
-          <View style={styles.heroCopy}>
-            <ThemedText style={styles.heroKicker}>EI KO PICKS</ThemedText>
-            <ThemedText style={styles.heroTitle}>
-              Quà Việt,{`\n`}gửi yêu thương.
-            </ThemedText>
-            <ThemedText style={styles.heroText}>
-              Quà tặng theo mùa và đồ thủ công chọn lọc cho mọi dịp đặc biệt.
-            </ThemedText>
-            <Pressable
-              style={styles.heroButton}
-              onPress={() => setSelectedCategory(null)}
-            >
-              <ThemedText style={styles.heroButtonText}>Mua ngay</ThemedText>
-              <Ionicons name="arrow-forward" size={15} color="#172b4d" />
-            </Pressable>
-          </View>
-          <View style={styles.heroArt}>
-            <View style={styles.heroSun} />
-            <ThemedText style={styles.lantern}></ThemedText>
-          </View>
-        </View>
-        <SectionHeader
-          title="Mua sắm theo danh mục"
-          onSeeAll={() => setSelectedCategory(null)}
-        />
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoryList}
-        >
-          {CATEGORIES.map((category) => (
-            <Pressable
-              key={category.label}
-              style={[
-                styles.category,
-                selectedCategory === category.label && styles.categoryActive,
-              ]}
-              onPress={() => setSelectedCategory(category.label)}
-            >
-              <View
-                style={[
-                  styles.categoryIcon,
-                  { backgroundColor: category.color },
-                ]}
-              >
-                <Ionicons name={category.icon} size={24} color="#593477" />
-              </View>
-              <ThemedText style={styles.categoryText}>
-                {category.label}
-              </ThemedText>
-            </Pressable>
-          ))}
-        </ScrollView>
-        {!selectedCategory &&
-          CATEGORIES.map((category) => {
-            const categoryProducts = products.filter(
-              (product) => product.category === category.label,
-            );
-            return (
-              <View key={category.label}>
-                <SectionHeader
-                  title={category.label}
-                  onSeeAll={() => setSelectedCategory(category.label)}
-                />
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.shelfProductList}
-                >
-                  {categoryProducts.slice(0, 4).map(
-                    (
-                      product,
-                      index, // ← ĐÃ SỬA: thêm index
-                    ) => (
-                      <ProductCard
-                        key={`${product.sku ?? product.name}-${index}`} // ← ĐÃ SỬA: key unique
-                        product={product}
-                        compact
-                        isFavorite={favoriteNames.has(product.name)}
-                        onToggleFavorite={onToggleFavorite}
-                        onSelectProduct={onSelectProduct}
-                      />
-                    ),
-                  )}
-                </ScrollView>
-              </View>
-            );
-          })}
-        <SectionHeader
-          title={selectedCategory || "Sản phẩm nổi bật"}
-          onSeeAll={() => setSelectedCategory(null)}
-        />
-        <View style={styles.productGrid}>
-          {visibleProducts.map(
-            (
-              product,
-              index, // ← ĐÃ SỬA: thêm index
-            ) => (
-              <ProductCard
-                key={`${product.sku ?? product.name}-${index}`} // ← ĐÃ SỬA: key unique
-                product={product}
-                isFavorite={favoriteNames.has(product.name)}
-                onToggleFavorite={onToggleFavorite}
-                onSelectProduct={onSelectProduct}
-              />
-            ),
-          )}
-        </View>
-        {search.length > 0 && visibleProducts.length === 0 && (
-          <ThemedText style={styles.noResults}>
-            Không tìm thấy món quà phù hợp.
-          </ThemedText>
-        )}
-        <View style={styles.promise}>
-          <Ionicons name="gift-outline" size={22} color="#7142a5" />
-          <View style={styles.promiseCopy}>
-            <ThemedText style={styles.promiseTitle}>
-              Gói quà thật xinh
-            </ThemedText>
-            <ThemedText style={styles.promiseText}>
-              Trao gửi yêu thương trọn vẹn
-            </ThemedText>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color="#9b82ac" />
-        </View>
-      </ScrollView>
-    </SafeAreaView>
-  );
-}
-
-function ProductCard({
-  product,
-  compact = false,
-  isFavorite,
-  onToggleFavorite,
-  onSelectProduct,
-}: {
-  product: Product;
-  compact?: boolean;
-  isFavorite: boolean;
-  onToggleFavorite: (product: Product) => void;
-  onSelectProduct: (product: Product) => void;
-}) {
-  return (
-    <Pressable
-      style={[styles.productCard, compact && styles.shelfProductCard]}
-      onPress={() => onSelectProduct(product)}
-    >
-      <View
-        style={[
-          styles.productImage,
-          compact && styles.shelfProductImage,
-          { backgroundColor: product.color },
-        ]}
-      >
-        {product.image ? (
-          <Image
-            source={{ uri: product.image }}
-            style={styles.productImageObject}
-            contentFit="cover"
-            accessibilityLabel={product.name}
-          />
-        ) : (
-          <ThemedText style={styles.productEmoji}>{product.icon}</ThemedText>
-        )}
-        <Pressable
-          style={styles.heart}
-          onPress={(event) => {
-            event.stopPropagation();
-            onToggleFavorite(product);
-          }}
-          accessibilityLabel="Yêu thích sản phẩm"
-        >
-          <Ionicons
-            name={isFavorite ? "heart" : "heart-outline"}
-            size={17}
-            color={isFavorite ? "#e66e88" : "#172b4d"}
-          />
-        </Pressable>
       </View>
-      <ThemedText style={styles.productName}>{product.name}</ThemedText>
-      <ThemedText style={styles.price}>{product.price}</ThemedText>
-      <ThemedText style={styles.delivery}>Giao hàng miễn phí</ThemedText>
-    </Pressable>
-  );
-}
 
-function SectionHeader({
-  title,
-  onSeeAll,
-}: {
-  title: string;
-  onSeeAll: () => void;
-}) {
-  return (
-    <View style={styles.sectionHeader}>
-      <ThemedText style={styles.sectionTitle}>{title}</ThemedText>
-      <Pressable onPress={onSeeAll}>
-        <ThemedText style={styles.seeAll}>Xem tất cả</ThemedText>
-      </Pressable>
+      {/* Icons bên phải: Location & Cart */}
+      <View style={styles.brandRight}>
+        <TouchableOpacity onPress={onOpenLocation} style={styles.iconBtn}>
+          <Ionicons name="location-sharp" size={22} color="#d97706" />
+          <Text style={styles.provinceText}>
+            {selectedProvince || "Hà Nội"}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={onOpenCart} style={styles.iconBtn}>
+          <Ionicons name="cart-outline" size={24} color="#333" />
+          {cartCount > 0 && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{cartCount}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      </View>
     </View>
   );
+
+  // --- 2. THANH TÌM KIẾM ---
+  const renderSearchBar = () => (
+    <View style={styles.searchBox}>
+      <Ionicons
+        name="search"
+        size={20}
+        color="#999"
+        style={{ marginRight: 8 }}
+      />
+      <TextInput
+        placeholder="Tìm túi cói, gốm sứ, tranh Đông Hồ..."
+        placeholderTextColor="#999"
+        value={searchQuery}
+        onChangeText={setSearchQuery}
+        style={styles.searchInput}
+      />
+      {searchQuery.length > 0 && (
+        <TouchableOpacity onPress={() => setSearchQuery("")}>
+          <Ionicons name="close-circle" size={20} color="#ccc" />
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+
+  // --- 3. DANH MỤC CATEGORY (CHIPS) ---
+  const renderCategories = () => (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.categoryScroll}
+    >
+      <TouchableOpacity
+        style={[styles.chip, !selectedCategory && styles.chipActive]}
+        onPress={() => setSelectedCategory(null)}
+      >
+        <Text
+          style={[styles.chipText, !selectedCategory && styles.chipTextActive]}
+        >
+          Tất cả
+        </Text>
+      </TouchableOpacity>
+
+      {CATEGORIES.map((cat) => (
+        <TouchableOpacity
+          key={cat.label}
+          style={[
+            styles.chip,
+            selectedCategory === cat.label && styles.chipActive,
+            {
+              backgroundColor:
+                selectedCategory === cat.label ? cat.color : "#f3f4f6",
+            },
+          ]}
+          onPress={() => setSelectedCategory(cat.label)}
+        >
+          <Ionicons
+            name={cat.icon as any}
+            size={16}
+            color="#555"
+            style={{ marginRight: 4 }}
+          />
+          <Text
+            style={[
+              styles.chipText,
+              selectedCategory === cat.label && styles.chipTextActive,
+            ]}
+          >
+            {cat.label}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </ScrollView>
+  );
+
+  // --- TRẠNG THÁI LOADING / ERROR ---
+  if (loading) {
+    return (
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color="#d97706" />
+        <Text style={styles.loadingText}>Đang tải kho hàng...</Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.centerContainer}>
+        <Ionicons name="cloud-offline-outline" size={48} color="#dc2626" />
+        <Text style={styles.errorTitle}>Lỗi kết nối Server</Text>
+        <Text style={styles.errorMessage}>{error}</Text>
+      </View>
+    );
+  }
+
+  // --- RENDER CHÍNH ---
+  return (
+    <FlatList
+      data={filteredProducts}
+      keyExtractor={(item) => item.id?.toString() || item.sku}
+      numColumns={COLUMN_COUNT}
+      columnWrapperStyle={styles.row}
+      contentContainerStyle={styles.listContent}
+      showsVerticalScrollIndicator={false}
+      // Gộp toàn bộ Header vào ListHeaderComponent
+      ListHeaderComponent={
+        <>
+          {renderBrandHeader()} {/* ✅ Logo + Tên Shop */}
+          {renderSearchBar()} {/* ✅ Thanh tìm kiếm */}
+          {renderCategories()} {/* ✅ Danh mục */}
+          <Text style={styles.sectionTitle}>
+            {selectedCategory
+              ? `Danh mục: ${selectedCategory}`
+              : "Sản phẩm nổi bật"}
+          </Text>
+        </>
+      }
+      ListEmptyComponent={
+        <View style={styles.emptyState}>
+          <Ionicons name="search-outline" size={48} color="#ccc" />
+          <Text style={styles.emptyText}>Không tìm thấy sản phẩm phù hợp.</Text>
+        </View>
+      }
+      renderItem={({ item }) => (
+        <ProductCard
+          product={item}
+          containerWidth={ITEM_WIDTH}
+          isFavorite={favoriteNames?.has(item.name)}
+          onToggleFavorite={() => onToggleFavorite && onToggleFavorite(item)}
+          onPress={() => onSelectProduct && onSelectProduct(item)}
+        />
+      )}
+    />
+  );
 }
+
+const styles = StyleSheet.create({
+  centerContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+    backgroundColor: "#fbf9fd",
+  },
+  loadingText: { marginTop: 12, fontSize: 16, color: "#666" },
+  errorTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#dc2626",
+    marginTop: 12,
+  },
+  errorMessage: { fontSize: 14, color: "#666", marginTop: 4 },
+
+  // Brand Header Styles
+  brandContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 15,
+    paddingTop: 15,
+    paddingBottom: 10,
+  },
+  brandLeft: { flexDirection: "row", alignItems: "center" },
+  logo: {
+    width: 45,
+    height: 45,
+    borderRadius: 22.5,
+    marginRight: 10,
+    backgroundColor: "#eee",
+  },
+  shopName: { fontSize: 18, fontWeight: "bold", color: "#1f2937" },
+  shopSlogan: { fontSize: 12, color: "#6b7280", marginTop: 2 },
+  brandRight: { flexDirection: "row", alignItems: "center" },
+  iconBtn: { marginLeft: 15, alignItems: "center", position: "relative" },
+  provinceText: {
+    fontSize: 11,
+    color: "#d97706",
+    fontWeight: "600",
+    marginTop: 2,
+  },
+  badge: {
+    position: "absolute",
+    top: -4,
+    right: -4,
+    backgroundColor: "#dc2626",
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  badgeText: { color: "#fff", fontSize: 10, fontWeight: "bold" },
+
+  // Search Box
+  searchBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginHorizontal: 15,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    marginBottom: 12,
+  },
+  searchInput: { flex: 1, fontSize: 14, color: "#333" },
+
+  // Categories
+  categoryScroll: {
+    paddingHorizontal: 15,
+    paddingVertical: 5,
+    marginBottom: 10,
+  },
+  chip: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginRight: 8,
+    backgroundColor: "#f3f4f6",
+  },
+  chipActive: { backgroundColor: "#d97706" },
+  chipText: { fontSize: 13, color: "#555", fontWeight: "500" },
+  chipTextActive: { color: "#fff", fontWeight: "bold" },
+
+  // List & Empty State
+  listContent: { paddingBottom: 30 },
+  row: { justifyContent: "space-between", paddingHorizontal: 5 },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#333",
+    marginLeft: 15,
+    marginBottom: 10,
+    marginTop: 5,
+  },
+  emptyState: { alignItems: "center", paddingVertical: 40 },
+  emptyText: { marginTop: 10, fontSize: 14, color: "#999" },
+});

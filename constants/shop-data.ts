@@ -7,6 +7,7 @@ export type Category = {
   color: string;
 };
 
+// ✅ ĐÃ SỬA: isFeatured từ number sang boolean
 export type Product = {
   id?: number;
   sku: string;
@@ -30,7 +31,7 @@ export type Product = {
   shippingInfo?: string;
   usage?: string;
   tags: string[];
-  isFeatured: number;
+  isFeatured: boolean;
 };
 
 const PRODUCT_IMAGE_POOL = [
@@ -55,6 +56,7 @@ export const CATEGORIES: Category[] = [
   { label: "Trang trí", icon: "home-outline", color: "#ffe0e9" },
 ];
 
+// ✅ ĐÃ SỬA: Tất cả isFeatured trong BASE_PRODUCTS đều chuyển sang true/false
 const BASE_PRODUCTS: Product[] = [
   {
     sku: "EIKO-001",
@@ -80,7 +82,7 @@ const BASE_PRODUCTS: Product[] = [
     shippingInfo: "Đóng hộp chống móp, giao toàn quốc từ 2-4 ngày",
     usage: "Dùng đi chợ, đi biển hoặc làm túi quà tặng hằng ngày",
     tags: ["thủ công", "Hội An", "quà tặng"],
-    isFeatured: 1,
+    isFeatured: true,
   },
   {
     sku: "EIKO-002",
@@ -106,7 +108,7 @@ const BASE_PRODUCTS: Product[] = [
     shippingInfo: "Bọc chống bụi, giao toàn quốc từ 2-4 ngày",
     usage: "Trưng trên bàn làm việc, kệ sách hoặc tặng dịp lễ",
     tags: ["Huế", "lụa", "lưu niệm"],
-    isFeatured: 1,
+    isFeatured: true,
   },
   {
     sku: "EIKO-003",
@@ -131,7 +133,7 @@ const BASE_PRODUCTS: Product[] = [
     shippingInfo: "Đóng 2 lớp chống sốc, giao toàn quốc từ 2-4 ngày",
     usage: "Cắm hoa, trưng trên kệ sách hoặc làm quà tặng tân gia",
     tags: ["gốm sứ", "Bát Tràng", "trang trí"],
-    isFeatured: 1,
+    isFeatured: true,
   },
   {
     sku: "EIKO-004",
@@ -156,7 +158,7 @@ const BASE_PRODUCTS: Product[] = [
     shippingInfo: "Gói chống xước, giao toàn quốc từ 2-4 ngày",
     usage: "Gắn vào chìa khóa, balo hoặc quai túi",
     tags: ["gỗ", "Việt Nam", "giá tốt"],
-    isFeatured: 0,
+    isFeatured: false,
   },
   {
     sku: "EIKO-005",
@@ -182,7 +184,7 @@ const BASE_PRODUCTS: Product[] = [
     shippingInfo: "Bọc góc chống va đập, giao toàn quốc từ 2-4 ngày",
     usage: "Treo ở phòng khách, phòng làm việc hoặc góc đọc sách",
     tags: ["trang trí", "Đông Hồ", "nghệ thuật"],
-    isFeatured: 1,
+    isFeatured: true,
   },
 ];
 
@@ -193,7 +195,7 @@ const CATEGORY_SEEDS: Record<string, ProductSeed[]> = {
     ["Bao lì xì thư pháp", "🧧", "49.000đ", "#f3b1a8"],
     ["Câu đối đỏ mini", "📜", "89.000đ", "#e9b2a2"],
     ["Móc khóa linh vật", "🐉", "69.000đ", "#f3cf8b"],
-    ["Dây treo mai vàng", "🌼", "129.000đ", "#f5d98b"],
+    ["Dây treo mai vàng", "", "129.000đ", "#f5d98b"],
     ["Tranh Tết ép kim", "🖼️", "259.000đ", "#e3b17e"],
     ["Đèn lồng đỏ mini", "🏮", "119.000đ", "#ef9f98"],
     ["Thiệp chúc Tết thủ công", "💌", "39.000đ", "#f0c8a4"],
@@ -210,13 +212,13 @@ const CATEGORY_SEEDS: Record<string, ProductSeed[]> = {
     ["Bộ sticker Giáng sinh", "⭐", "49.000đ", "#c9dced"],
   ],
   Halloween: [
-    ["Mặt nạ bí ngô", "🎃", "129.000đ", "#efa46d"],
+    ["Mặt nạ bí ngô", "", "129.000đ", "#efa46d"],
     ["Đèn ma giấy", "👻", "99.000đ", "#d8c6e6"],
     ["Băng đô phù thủy", "🧙", "89.000đ", "#bfa7d8"],
     ["Sticker Halloween", "🕷️", "45.000đ", "#c6b3d8"],
     ["Móc khóa mèo đen", "🐈‍⬛", "69.000đ", "#b9a8c5"],
     ["Dây treo bí ngô", "🎃", "139.000đ", "#e6a16f"],
-    ["Thiệp Halloween", "🦇", "39.000đ", "#c5b1d8"],
+    ["Thiệp Halloween", "", "39.000đ", "#c5b1d8"],
     ["Khăn choàng hóa trang", "🧣", "179.000đ", "#b7a4ca"],
   ],
   "Sinh nhật": [
@@ -233,27 +235,27 @@ const CATEGORY_SEEDS: Record<string, ProductSeed[]> = {
     ["Khăn lụa Nha Xá", "🧣", "259.000đ", "#e9bfd2"],
     ["Áo bà ba Nam Bộ", "👚", "389.000đ", "#b9d5e8"],
     ["Nón lá Huế mini", "👒", "149.000đ", "#efe0a8"],
-    ["Túi thổ cẩm Mai Châu", "🎒", "239.000đ", "#d9b9a8"],
+    ["Túi thổ cẩm Mai Châu", "", "239.000đ", "#d9b9a8"],
     ["Ví da thủ công Hội An", "👛", "315.000đ", "#c99772"],
     ["Cà vạt lụa Việt", "👔", "229.000đ", "#b8c8e8"],
     ["Băng đô vải thổ cẩm", "🎀", "89.000đ", "#e8a9b8"],
-    ["Khăn rằn Nam Bộ", "🧵", "119.000đ", "#d5d9d2"],
+    ["Khăn rằn Nam Bộ", "", "119.000đ", "#d5d9d2"],
     ["Áo sơ mi linen Việt", "👕", "425.000đ", "#d9e5d0"],
     ["Dép cói miền biển", "🩴", "179.000đ", "#e6c08f"],
     ["Vòng tay bạc H'Mông", "📿", "349.000đ", "#c9ced7"],
-    ["Mũ cói vành rộng", "👒", "219.000đ", "#e8d2a4"],
+    ["Mũ cói vành rộng", "", "219.000đ", "#e8d2a4"],
     ["Túi vải canvas Việt", "👜", "159.000đ", "#c3d7df"],
     ["Áo khoác chàm Indigo", "🧥", "529.000đ", "#a8bdd7"],
-    ["Kẹp tóc gỗ dừa", "🪮", "69.000đ", "#dcb78f"],
+    ["Kẹp tóc gỗ dừa", "", "69.000đ", "#dcb78f"],
     ["Thắt lưng da bò", "〰️", "289.000đ", "#b9825e"],
     ["Áo len Đà Lạt", "🧶", "459.000đ", "#d5c4df"],
     ["Khuyên tai bạc Thái", "💎", "195.000đ", "#d1d9e5"],
-    ["Túi đeo chéo thổ cẩm", "🛍️", "279.000đ", "#d8b3c8"],
+    ["Túi đeo chéo thổ cẩm", "️", "279.000đ", "#d8b3c8"],
   ],
   "Đồ thủ công": [
     ["Đèn lồng Hội An", "🏮", "189.000đ", "#f0b083"],
     ["Bình hoa mây tre", "🧺", "229.000đ", "#d9bd8c"],
-    ["Khay tre đan tay", "🪵", "145.000đ", "#e1c99e"],
+    ["Khay tre đan tay", "", "145.000đ", "#e1c99e"],
     ["Sổ tay giấy dó", "📓", "85.000đ", "#e6d6b8"],
     ["Móc treo gỗ khắc chữ", "🪝", "75.000đ", "#c99b70"],
     ["Quạt giấy nghệ thuật", "🪭", "119.000đ", "#f0c1bd"],
@@ -276,12 +278,12 @@ const CATEGORY_SEEDS: Record<string, ProductSeed[]> = {
     ["Đĩa trang trí Bát Tràng", "🍽️", "185.000đ", "#d9c4b0"],
     ["Tranh sơn dầu phố cổ", "🎨", "495.000đ", "#e1b88b"],
     ["Đèn tre treo trần", "💡", "389.000đ", "#e8cc99"],
-    ["Tượng cò gỗ", "🦢", "219.000đ", "#d7c1a7"],
+    ["Tượng cò gỗ", "", "219.000đ", "#d7c1a7"],
     ["Gương mây tròn", "🪞", "299.000đ", "#dfc092"],
     ["Lọ hoa gốm men rạn", "🌷", "259.000đ", "#c1d5d2"],
     ["Bộ tranh hoa sen", "🪷", "369.000đ", "#e4b9c8"],
     ["Thảm cói dệt tay", "🟨", "329.000đ", "#dfc78f"],
-    ["Đồng hồ gỗ treo tường", "🕰️", "449.000đ", "#c79d76"],
+    ["Đồng hồ gỗ treo tường", "️", "449.000đ", "#c79d76"],
     ["Kệ sách tre nhỏ", "📚", "279.000đ", "#d8b889"],
     ["Tượng voi gốm", "🐘", "159.000đ", "#becbc7"],
     ["Bình treo tường mây", "🪴", "239.000đ", "#d5b78b"],
@@ -324,7 +326,8 @@ function createSeedProduct(
     shippingInfo: "Đóng gói cẩn thận, giao toàn quốc từ 2-4 ngày",
     usage: "Dùng hằng ngày hoặc làm quà tặng trong các dịp đặc biệt",
     tags: [category, "quà Việt", "EiKo"],
-    isFeatured: index < 4 ? 1 : 0,
+    // ✅ ĐÃ SỬA: Trả về boolean thay vì số 1/0
+    isFeatured: index < 4,
   };
 }
 

@@ -2,16 +2,16 @@ import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useMemo, useState } from "react";
 import {
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    TextInput,
-    View,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  View,
 } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
 import { CATEGORIES, type Product } from "@/constants/shop-data";
-import { useShopProducts } from "@/database/use-shop-products";
+import { useShopProducts } from "@/hooks/useShopProducts";
 import { ProductModal } from "./CustomerModals";
 
 type SortMode = "featured" | "priceAsc" | "priceDesc" | "rating";

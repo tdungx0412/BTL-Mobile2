@@ -2,18 +2,18 @@ import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useMemo, useState } from "react";
 import {
-    Modal,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Switch,
-    TextInput,
-    View,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  TextInput,
+  View,
 } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
 import { type Product } from "@/constants/shop-data";
-import { useShopProducts } from "@/database/use-shop-products";
+import { useShopProducts } from "@/hooks/useShopProducts";
 import { ProductModal } from "./CustomerModals";
 
 /* ================= Kiểu dữ liệu ================= */

@@ -2,35 +2,30 @@ import { useState } from "react";
 import { StyleSheet } from "react-native";
 
 import {
-    CartModal,
-    CheckoutModal,
-    LocationModal,
-    ProductModal,
-    ShopHomeContent,
+  CartModal,
+  CheckoutModal,
+  LocationModal,
+  ProductModal,
 } from "@/components/shop";
 import { ThemedView } from "@/components/themed-view";
-import type { Product } from "@/constants/shop-data";
-import { useShopProducts } from "../../database/use-shop-products";
+import type { Product } from "@/constants/shop-data"; // Giữ lại type này cho Modal/Cart
+import ShopHomeContent from "../../components/shop/ShopHomeContent";
 
 export default function HomeScreen() {
-  const products = useShopProducts();
+  // State quản lý UI/Modal (Giữ nguyên)
   const [selectedProvince, setSelectedProvince] = useState("Hà Nội");
   const [isMenuVisible, setIsMenuVisible] = useState(false);
-  const [search, setSearch] = useState("");
-  const [provinceSearch, setProvinceSearch] = useState("");
   const [favoriteNames, setFavoriteNames] = useState<Set<string>>(new Set());
   const [cartItems, setCartItems] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isCartVisible, setIsCartVisible] = useState(false);
   const [isCheckoutVisible, setIsCheckoutVisible] = useState(false);
 
+  //_handlers_ (Giữ nguyên logic)
   const openLocationMenu = () => {
-    setProvinceSearch("");
     setIsMenuVisible(true);
   };
-
   const closeLocationMenu = () => setIsMenuVisible(false);
-
   const selectProvince = (province: string) => {
     setSelectedProvince(province);
     closeLocationMenu();
@@ -57,22 +52,21 @@ export default function HomeScreen() {
   return (
     <ThemedView style={styles.screen}>
       <ShopHomeContent
-        products={products}
         selectedProvince={selectedProvince}
         onOpenLocation={openLocationMenu}
-        search={search}
-        onSearchChange={setSearch}
         favoriteNames={favoriteNames}
         onToggleFavorite={toggleFavorite}
         onSelectProduct={setSelectedProduct}
         cartCount={cartItems.length}
         onOpenCart={() => setIsCartVisible(true)}
       />
+
+      {/* Các Modal giữ nguyên */}
       <LocationModal
         visible={isMenuVisible}
-        search={provinceSearch}
+        search=""
         selectedProvince={selectedProvince}
-        onSearchChange={setProvinceSearch}
+        onSearchChange={() => {}}
         onClose={closeLocationMenu}
         onSelect={selectProvince}
       />
@@ -92,9 +86,7 @@ export default function HomeScreen() {
         items={cartItems}
         onClose={() => setIsCartVisible(false)}
         onRemove={(name) =>
-          setCartItems((current) =>
-            current.filter((item) => item.name !== name),
-          )
+          setCartItems((c) => c.filter((i) => i.name !== name))
         }
         onCheckout={() => {
           setIsCartVisible(false);
@@ -116,8 +108,5 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    backgroundColor: "#fbf9fd",
-    flex: 1,
-  },
+  screen: { backgroundColor: "#fbf9fd", flex: 1 },
 });
