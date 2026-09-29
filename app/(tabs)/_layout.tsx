@@ -1,48 +1,47 @@
+// app/(tabs)/_layout.tsx
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 
-import { IconSymbol } from "@/components/ui/icon-symbol";
-import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
-
 export default function TabLayout() {
-  const colorScheme = useColorScheme() ?? "light";
-  const safeScheme = colorScheme === "dark" ? "dark" : "light";
-
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[safeScheme].tint,
         headerShown: false,
+        tabBarActiveTintColor: "#d97706",
+        tabBarInactiveTintColor: "#9ca3af",
+        tabBarStyle: {
+          backgroundColor: "#ffffff",
+          borderTopColor: "#e5e7eb",
+          height: 60,
+          paddingBottom: 8,
+          paddingTop: 8,
+        },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
           title: "Trang chủ",
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="house.fill" color={color} />
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="home-outline" size={size} color={color} />
           ),
         }}
       />
-
-      {/* Tab Quản lý chính */}
       <Tabs.Screen
         name="explore"
         options={{
           title: "Quản lý",
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="paperplane.fill" color={color} />
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="cube-outline" size={size} color={color} />
           ),
         }}
       />
-
       <Tabs.Screen
         name="account"
         options={{
           title: "Tài khoản",
-          tabBarIcon: ({ color }) => (
-            <Ionicons size={26} name="person-outline" color={color} />
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="person-outline" size={size} color={color} />
           ),
         }}
       />

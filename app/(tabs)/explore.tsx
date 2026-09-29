@@ -1,13 +1,13 @@
 // app/(tabs)/explore.tsx
 import { ThemedView } from "@/components/themed-view";
 import { Ionicons } from "@expo/vector-icons";
-import * as ImagePicker from "expo-image-picker"; // <-- THÊM IMPORT NÀY
+import * as ImagePicker from "expo-image-picker";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   FlatList,
-  Image, 
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -20,6 +20,17 @@ import {
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001/api";
 
+// Danh sách danh mục cố định để chọn
+const CATEGORIES = [
+  "Đồ thủ công",
+  "Điện tử",
+  "Thời trang",
+  "Gia dụng",
+  "Thực phẩm",
+  "Sách & Văn phòng phẩm",
+  "Khác",
+];
+
 // Interface cho Sản phẩm
 interface ProductItem {
   id: number;
@@ -29,7 +40,7 @@ interface ProductItem {
   stock: number;
   sku: string;
   description?: string;
-  image?: string; 
+  image?: string;
 }
 
 // Interface cho Nhân viên (Giả lập)
@@ -53,6 +64,8 @@ export default function ExploreScreen() {
   const [search, setSearch] = useState("");
 
   const [modalVisible, setModalVisible] = useState(false);
+  const [categoryModalVisible, setCategoryModalVisible] = useState(false); // State modal danh mục
+
   const [editingProduct, setEditingProduct] = useState<ProductItem | null>(
     null,
   );
@@ -62,7 +75,7 @@ export default function ExploreScreen() {
     category: "",
     stock: "0",
     description: "",
-    image: "", 
+    image: "",
   });
   const [submitting, setSubmitting] = useState(false);
 
@@ -148,31 +161,30 @@ export default function ExploreScreen() {
     setModalVisible(true);
   };
 
-  // --- HÀM CHỌN ẢNH TỪ THƯ VIỆN ---
+  // Hàm chọn ảnh từ thư viện
   const pickImage = async () => {
-    // Yêu cầu quyền truy cập
     let permissionResult =
       await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (permissionResult.granted === false) {
       Alert.alert(
         "Cần quyền truy cập",
-        "Vui lòng cấp quyền truy cập thư viện ảnh để tiếp tục.",
+        "Vui lòng cấp quyền truy cập thư viện ảnh.",
       );
       return;
     }
 
-    // Mở bộ chọn ảnh
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [4, 3],
-      quality: 0.8,
+      quality: 0.3, // Giảm chất lượng để chuỗi Base64 ngắn hơn
+      base64: true,
     });
 
     if (!result.canceled) {
-      // Cập nhật state với đường dẫn ảnh cục bộ
-      setFormData({ ...formData, image: result.assets[0].uri });
+      const base64Image = `data:image/jpeg;base64,${result.assets[0].base64}`;
+      setFormData({ ...formData, image: base64Image });
     }
   };
 
@@ -188,26 +200,38 @@ export default function ExploreScreen() {
         ? `${API_URL}/products/${editingProduct.id}`
         : `${API_URL}/products`;
 
-      // Lưu ý: Nếu dùng ảnh cục bộ (file://), bạn cần upload lên server trước khi gửi JSON.
-      // Ở đây giả định bạn sẽ xử lý việc upload hoặc dùng URL public.
-      const body = {
-        ...formData,
+      const bodyData = {
+        name: formData.name,
         price: formData.price + ".000đ",
+        category: formData.category,
         stock: Number(formData.stock),
+        description: formData.description,
+        image: formData.image || "",
       };
 
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify(bodyData),
       });
-      if (!res.ok) throw new Error("Server lỗi");
 
-      Alert.alert("Thành công", editingProduct ? "Đã cập nhật" : "Đã thêm mới");
+      const result = await res.json();
+
+      if (!res.ok) {
+        throw new Error(result.message || "Có lỗi xảy ra từ phía Server");
+      }
+
+      Alert.alert(
+        "Thành công",
+        editingProduct
+          ? "Đã cập nhật sản phẩm"
+          : "Đã thêm sản phẩm mới vào kho",
+      );
       setModalVisible(false);
       fetchProducts(search);
-    } catch (err) {
-      Alert.alert("Thất bại", "Không thể lưu vào MySQL");
+    } catch (err: any) {
+      console.error("Lỗi chi tiết:", err);
+      Alert.alert("Thất bại", err.message || "Không thể kết nối đến Server");
     } finally {
       setSubmitting(false);
     }
@@ -238,7 +262,6 @@ export default function ExploreScreen() {
       activeOpacity={0.9}
       onPress={() => openForm(item)}
     >
-      {/* Hiển thị ảnh nhỏ nếu có */}
       {item.image ? (
         <Image source={{ uri: item.image }} style={styles.productThumb} />
       ) : (
@@ -271,7 +294,7 @@ export default function ExploreScreen() {
     </TouchableOpacity>
   );
 
-  // Render Item Nhân viên (Giả lập)
+  // Render Item Nhân viên
   const renderStaffItem = ({ item }: { item: StaffItem }) => (
     <TouchableOpacity
       style={styles.card}
@@ -321,7 +344,6 @@ export default function ExploreScreen() {
           )}
         </View>
 
-        {/* Thanh chuyển đổi Sản phẩm / Nhân viên */}
         <View style={styles.tabSwitcher}>
           <TouchableOpacity
             style={[
@@ -373,7 +395,6 @@ export default function ExploreScreen() {
       {/* Nội dung động theo Tab */}
       {activeSubTab === "products" ? (
         <>
-          {/* Thanh tìm kiếm chỉ hiện ở tab Sản phẩm */}
           <View style={styles.searchBox}>
             <Ionicons name="search" size={20} color="#999" />
             <TextInput
@@ -405,7 +426,6 @@ export default function ExploreScreen() {
           )}
         </>
       ) : (
-        // Giao diện Tab Nhân viên
         <FlatList
           data={staffs}
           keyExtractor={(item) => item.id.toString()}
@@ -479,8 +499,6 @@ export default function ExploreScreen() {
                 </Text>
                 <Ionicons name="image-outline" size={20} color="#666" />
               </TouchableOpacity>
-
-              {/* Xem trước ảnh */}
               {formData.image ? (
                 <View style={{ marginTop: 10, alignItems: "center" }}>
                   <Image
@@ -506,6 +524,7 @@ export default function ExploreScreen() {
                 placeholder="Ví dụ: Túi cói Hội An"
               />
             </View>
+
             <View style={styles.row}>
               <View style={[styles.formGroup, { flex: 1, marginRight: 10 }]}>
                 <Text style={styles.label}>Giá bán *</Text>
@@ -538,15 +557,33 @@ export default function ExploreScreen() {
                 />
               </View>
             </View>
+
+            {/* Ô CHỌN DANH MỤC (PICKER) */}
             <View style={styles.formGroup}>
               <Text style={styles.label}>Danh mục</Text>
-              <TextInput
-                style={styles.textInput}
-                value={formData.category}
-                onChangeText={(t) => setFormData({ ...formData, category: t })}
-                placeholder="Đồ thủ công..."
-              />
+              <TouchableOpacity
+                style={[
+                  styles.textInput,
+                  {
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                  },
+                ]}
+                onPress={() => setCategoryModalVisible(true)}
+              >
+                <Text
+                  style={{
+                    color: formData.category ? "#1f2937" : "#999",
+                    flex: 1,
+                  }}
+                >
+                  {formData.category || "Chọn danh mục..."}
+                </Text>
+                <Ionicons name="chevron-down" size={20} color="#666" />
+              </TouchableOpacity>
             </View>
+
             <TouchableOpacity
               style={[styles.submitBtn, submitting && styles.disabledBtn]}
               onPress={handleSubmitProduct}
@@ -562,6 +599,54 @@ export default function ExploreScreen() {
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* MODAL CHỌN DANH MỤC */}
+      <Modal visible={categoryModalVisible} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxHeight: "80%" }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Chọn danh mục</Text>
+              <TouchableOpacity onPress={() => setCategoryModalVisible(false)}>
+                <Ionicons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+
+            <FlatList
+              data={CATEGORIES}
+              keyExtractor={(item) => item}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.categoryItem,
+                    formData.category === item && styles.categoryItemSelected,
+                  ]}
+                  onPress={() => {
+                    setFormData({ ...formData, category: item });
+                    setCategoryModalVisible(false);
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.categoryText,
+                      formData.category === item && styles.categoryTextSelected,
+                    ]}
+                  >
+                    {item}
+                  </Text>
+                  {formData.category === item && (
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={20}
+                      color="#d97706"
+                    />
+                  )}
+                </TouchableOpacity>
+              )}
+              showsVerticalScrollIndicator={false}
+            />
+          </View>
+        </View>
       </Modal>
     </ThemedView>
   );
@@ -637,7 +722,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 2,
-    alignItems: "center", // Căn giữa theo chiều dọc
+    alignItems: "center",
   },
   productThumb: {
     width: 50,
@@ -749,4 +834,26 @@ const styles = StyleSheet.create({
   },
   disabledBtn: { opacity: 0.7 },
   submitText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
+
+  // Category Picker Styles
+  categoryItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f3f4f6",
+  },
+  categoryItemSelected: {
+    backgroundColor: "#fffbeb",
+  },
+  categoryText: {
+    fontSize: 15,
+    color: "#4b5563",
+  },
+  categoryTextSelected: {
+    color: "#d97706",
+    fontWeight: "600",
+  },
 });
