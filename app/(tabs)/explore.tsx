@@ -31,7 +31,6 @@ const CATEGORIES = [
   "Khác",
 ];
 
-// Interface cho Sản phẩm
 interface ProductItem {
   id: number;
   name: string;
@@ -43,32 +42,19 @@ interface ProductItem {
   image?: string;
 }
 
-// Interface cho Nhân viên (Giả lập)
-interface StaffItem {
-  id: number;
-  name: string;
-  role: string;
-  phone: string;
-  status: "active" | "inactive";
-}
-
 export default function ExploreScreen() {
-  // State chuyển đổi tab con
-  const [activeSubTab, setActiveSubTab] = useState<"products" | "staff">(
-    "products",
-  );
-
-  // --- STATE & LOGIC CHO SẢN PHẨM ---
+  // --- STATE SẢN PHẨM ---
   const [products, setProducts] = useState<ProductItem[]>([]);
   const [loadingProd, setLoadingProd] = useState(true);
   const [search, setSearch] = useState("");
 
+  // --- STATE FORM & MODAL ---
   const [modalVisible, setModalVisible] = useState(false);
-  const [categoryModalVisible, setCategoryModalVisible] = useState(false); // State modal danh mục
-
+  const [categoryModalVisible, setCategoryModalVisible] = useState(false);
   const [editingProduct, setEditingProduct] = useState<ProductItem | null>(
     null,
   );
+
   const [formData, setFormData] = useState({
     name: "",
     price: "",
@@ -78,31 +64,6 @@ export default function ExploreScreen() {
     image: "",
   });
   const [submitting, setSubmitting] = useState(false);
-
-  // --- STATE GIẢ LẬP CHO NHÂN VIÊN ---
-  const [staffs, setStaffs] = useState<StaffItem[]>([
-    {
-      id: 1,
-      name: "Nguyễn Văn A",
-      role: "Quản lý",
-      phone: "0901234567",
-      status: "active",
-    },
-    {
-      id: 2,
-      name: "Trần Thị B",
-      role: "Bán hàng",
-      phone: "0912345678",
-      status: "active",
-    },
-    {
-      id: 3,
-      name: "Lê Văn C",
-      role: "Kho vận",
-      phone: "0987654321",
-      status: "inactive",
-    },
-  ]);
 
   // Fetch sản phẩm
   const fetchProducts = async (keyword?: string) => {
@@ -123,11 +84,8 @@ export default function ExploreScreen() {
   };
 
   useEffect(() => {
-    if (activeSubTab === "products") {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      fetchProducts();
-    }
-  }, [activeSubTab]);
+    fetchProducts();
+  }, []);
 
   const handleSearch = (text: string) => {
     setSearch(text);
@@ -161,11 +119,9 @@ export default function ExploreScreen() {
     setModalVisible(true);
   };
 
-  // Hàm chọn ảnh từ thư viện
   const pickImage = async () => {
     let permissionResult =
       await ImagePicker.requestMediaLibraryPermissionsAsync();
-
     if (permissionResult.granted === false) {
       Alert.alert(
         "Cần quyền truy cập",
@@ -178,7 +134,7 @@ export default function ExploreScreen() {
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [4, 3],
-      quality: 0.3, // Giảm chất lượng để chuỗi Base64 ngắn hơn
+      quality: 0.3,
       base64: true,
     });
 
@@ -255,7 +211,6 @@ export default function ExploreScreen() {
     ]);
   };
 
-  // Render Item Sản phẩm
   const renderProductItem = ({ item }: { item: ProductItem }) => (
     <TouchableOpacity
       style={styles.card}
@@ -294,166 +249,47 @@ export default function ExploreScreen() {
     </TouchableOpacity>
   );
 
-  // Render Item Nhân viên
-  const renderStaffItem = ({ item }: { item: StaffItem }) => (
-    <TouchableOpacity
-      style={styles.card}
-      activeOpacity={0.9}
-      onPress={() => Alert.alert("Chi tiết", `Sửa thông tin ${item.name}`)}
-    >
-      <View style={styles.cardInfo}>
-        <Text style={styles.name}>{item.name}</Text>
-        <Text style={styles.role}>
-          {item.role} • {item.phone}
-        </Text>
-        <View style={styles.statusBadge}>
-          <Text
-            style={[
-              styles.statusText,
-              item.status === "active"
-                ? styles.activeStatus
-                : styles.inactiveStatus,
-            ]}
-          >
-            {item.status === "active" ? "Đang làm việc" : "Nghỉ việc"}
-          </Text>
-        </View>
-      </View>
-      <View style={styles.actions}>
-        <TouchableOpacity style={styles.iconBtn}>
-          <Ionicons name="create-outline" size={20} color="#d97706" />
-        </TouchableOpacity>
-      </View>
-    </TouchableOpacity>
-  );
-
-  // --- GIAO DIỆN CHÍNH ---
   return (
     <ThemedView style={styles.container}>
-      {/* Header & Tab Switcher */}
+      {/* Header & Tìm kiếm */}
       <View style={styles.headerArea}>
         <View style={styles.topHeader}>
-          <Text style={styles.title}>Trung tâm Quản lý</Text>
-          {activeSubTab === "products" && (
-            <TouchableOpacity
-              onPress={() => openForm()}
-              style={styles.addBtnHeader}
-            >
-              <Ionicons name="add-circle" size={32} color="#d97706" />
-            </TouchableOpacity>
-          )}
+          <Text style={styles.title}>Quản lý Sản phẩm</Text>
+          <TouchableOpacity
+            onPress={() => openForm()}
+            style={styles.addBtnHeader}
+          >
+            <Ionicons name="add-circle" size={32} color="#d97706" />
+          </TouchableOpacity>
         </View>
 
-        <View style={styles.tabSwitcher}>
-          <TouchableOpacity
-            style={[
-              styles.switchTab,
-              activeSubTab === "products" && styles.activeSwitch,
-            ]}
-            onPress={() => setActiveSubTab("products")}
-          >
-            <Ionicons
-              name="cube-outline"
-              size={18}
-              color={activeSubTab === "products" ? "#fff" : "#666"}
-              style={{ marginRight: 6 }}
-            />
-            <Text
-              style={[
-                styles.switchText,
-                activeSubTab === "products" && styles.activeSwitchText,
-              ]}
-            >
-              Sản phẩm
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.switchTab,
-              activeSubTab === "staff" && styles.activeSwitch,
-            ]}
-            onPress={() => setActiveSubTab("staff")}
-          >
-            <Ionicons
-              name="people-outline"
-              size={18}
-              color={activeSubTab === "staff" ? "#fff" : "#666"}
-              style={{ marginRight: 6 }}
-            />
-            <Text
-              style={[
-                styles.switchText,
-                activeSubTab === "staff" && styles.activeSwitchText,
-              ]}
-            >
-              Nhân viên
-            </Text>
-          </TouchableOpacity>
+        <View style={styles.searchBox}>
+          <Ionicons name="search" size={20} color="#999" />
+          <TextInput
+            placeholder="Tìm tên hoặc SKU..."
+            value={search}
+            onChangeText={handleSearch}
+            style={styles.input}
+            clearButtonMode="while-editing"
+          />
         </View>
       </View>
 
-      {/* Nội dung động theo Tab */}
-      {activeSubTab === "products" ? (
-        <>
-          <View style={styles.searchBox}>
-            <Ionicons name="search" size={20} color="#999" />
-            <TextInput
-              placeholder="Tìm tên hoặc SKU..."
-              value={search}
-              onChangeText={handleSearch}
-              style={styles.input}
-              clearButtonMode="while-editing"
-            />
-          </View>
-
-          {loadingProd && products.length === 0 ? (
-            <View style={styles.center}>
-              <ActivityIndicator size="large" color="#d97706" />
-            </View>
-          ) : (
-            <FlatList
-              data={products}
-              keyExtractor={(item) => item.id.toString()}
-              renderItem={renderProductItem}
-              contentContainerStyle={styles.list}
-              showsVerticalScrollIndicator={false}
-              ListEmptyComponent={
-                <View style={styles.emptyState}>
-                  <Text style={styles.emptyText}>Không tìm thấy sản phẩm</Text>
-                </View>
-              }
-            />
-          )}
-        </>
+      {/* Danh sách sản phẩm */}
+      {loadingProd && products.length === 0 ? (
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color="#d97706" />
+        </View>
       ) : (
         <FlatList
-          data={staffs}
+          data={products}
           keyExtractor={(item) => item.id.toString()}
-          renderItem={renderStaffItem}
+          renderItem={renderProductItem}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
-          ListHeaderComponent={
-            <View style={styles.staffHeader}>
-              <Text style={styles.staffCount}>
-                Tổng số: {staffs.length} nhân viên
-              </Text>
-              <TouchableOpacity
-                style={styles.addStaffBtn}
-                onPress={() =>
-                  Alert.alert(
-                    "Thông báo",
-                    "Tính năng thêm nhân viên đang phát triển",
-                  )
-                }
-              >
-                <Ionicons
-                  name="person-add"
-                  size={16}
-                  color="#fff"
-                  style={{ marginRight: 4 }}
-                />
-                <Text style={styles.addStaffText}>Thêm NV</Text>
-              </TouchableOpacity>
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyText}>Không tìm thấy sản phẩm</Text>
             </View>
           }
         />
@@ -475,7 +311,6 @@ export default function ExploreScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Ô chọn ảnh */}
             <View style={styles.formGroup}>
               <Text style={styles.label}>Ảnh sản phẩm</Text>
               <TouchableOpacity
@@ -667,33 +502,6 @@ const styles = StyleSheet.create({
   title: { fontSize: 24, fontWeight: "bold", color: "#1f2937" },
   addBtnHeader: { padding: 5 },
 
-  // Tab Switcher
-  tabSwitcher: {
-    flexDirection: "row",
-    backgroundColor: "#e5e7eb",
-    borderRadius: 12,
-    padding: 4,
-    marginBottom: 10,
-  },
-  switchTab: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 10,
-    borderRadius: 10,
-  },
-  activeSwitch: {
-    backgroundColor: "#d97706",
-    shadowColor: "#d97706",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  switchText: { fontSize: 14, color: "#666", fontWeight: "600" },
-  activeSwitchText: { color: "#fff", fontWeight: "bold" },
-
   // Search
   searchBox: {
     flexDirection: "row",
@@ -739,7 +547,6 @@ const styles = StyleSheet.create({
   cardInfo: { flex: 1, justifyContent: "center" },
   name: { fontSize: 16, fontWeight: "bold", color: "#1f2937", marginBottom: 4 },
   price: { fontSize: 15, color: "#d97706", fontWeight: "600", marginBottom: 4 },
-  role: { fontSize: 14, color: "#4b5563", marginBottom: 4 },
   metaRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -761,36 +568,6 @@ const styles = StyleSheet.create({
 
   emptyState: { alignItems: "center", paddingTop: 60 },
   emptyText: { marginTop: 12, fontSize: 14, color: "#999" },
-
-  // Staff Specific
-  staffHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  staffCount: { fontSize: 14, color: "#666", fontWeight: "500" },
-  addStaffBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#4b5563",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-  },
-  addStaffText: { color: "#fff", fontSize: 12, fontWeight: "bold" },
-  statusBadge: { marginTop: 4 },
-  statusText: {
-    fontSize: 11,
-    fontWeight: "bold",
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
-    overflow: "hidden",
-    alignSelf: "flex-start",
-  },
-  activeStatus: { backgroundColor: "#d1fae5", color: "#059669" },
-  inactiveStatus: { backgroundColor: "#fee2e2", color: "#dc2626" },
 
   // Modal Styles
   modalOverlay: {

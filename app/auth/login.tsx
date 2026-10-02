@@ -37,6 +37,8 @@ export default function LoginScreen() {
       if (!res.ok) throw new Error(data.message);
 
       await AsyncStorage.setItem("userToken", JSON.stringify(data));
+
+      // Chuyển vào app chính sau khi login thành công
       router.replace("/(tabs)");
     } catch (err: any) {
       Alert.alert("Đăng nhập thất bại", err.message);

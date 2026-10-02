@@ -1,28 +1,28 @@
 // app/_layout.tsx
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Redirect, Slot } from "expo-router";
+import { Slot } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 
 export default function RootLayout() {
-  const [isLoading, setIsLoading] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    const checkAuth = async () => {
+    const prepare = async () => {
       try {
-        const token = await AsyncStorage.getItem("userToken");
-        setIsAuthenticated(!!token);
+        // Chỉ cần đọc thử AsyncStorage để đảm bảo nó sẵn sàng
+        await AsyncStorage.getItem("userToken");
       } catch (e) {
-        console.error("Lỗi kiểm tra auth:", e);
+        console.error("Lỗi khởi tạo storage:", e);
       } finally {
-        setIsLoading(false);
+        // Báo hiệu đã sẵn sàng render app
+        setIsReady(true);
       }
     };
-    checkAuth();
+    prepare();
   }, []);
 
-  if (isLoading) {
+  if (!isReady) {
     return (
       <View
         style={{
@@ -37,11 +37,6 @@ export default function RootLayout() {
     );
   }
 
-  // Nếu chưa đăng nhập, chặn truy cập và chuyển về Login
-  if (!isAuthenticated) {
-    return <Redirect href="/auth/login" />;
-  }
-
-  // Đã đăng nhập thì render các route con
+  // Render Slot an toàn, không bao giờ bị redirect loop
   return <Slot />;
 }
