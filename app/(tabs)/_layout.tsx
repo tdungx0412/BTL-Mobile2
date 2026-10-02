@@ -56,18 +56,7 @@ export default function TabLayout() {
         }}
       />
 
-      {/* TAB 4: TÍNH LƯƠNG (MỚI) */}
-      <Tabs.Screen
-        name="salary"
-        options={{
-          title: "Tính lương",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="cash-outline" size={size} color={color} />
-          ),
-        }}
-      />
-
-      {/* TAB 5: TÀI KHOẢN */}
+      {/* TAB 4: TÀI KHOẢN (Đã chuyển lên thay thế vị trí cũ) */}
       <Tabs.Screen
         name="account"
         options={{
