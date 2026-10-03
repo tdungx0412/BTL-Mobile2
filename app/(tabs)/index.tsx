@@ -16,7 +16,7 @@ import {
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001/api";
 
-interface PersonalService {
+interface ServiceItem {
   id: number;
   name: string;
   price: number;
@@ -28,18 +28,15 @@ interface PersonalService {
 
 export default function HomeScreen() {
   const router = useRouter();
-  const [services, setServices] = useState<PersonalService[]>([]);
+  const [services, setServices] = useState<ServiceItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasFetched, setHasFetched] = useState(false);
 
-  // ✅ SỬA LỖI TDZ: KHAI BÁO HÀM TRƯỚC
+  // ✅ Pattern Initialize-on-Render (Không dùng useEffect)
   const fetchServices = async () => {
     try {
       const res = await fetch(`${API_URL}/personal-services`);
-      if (res.ok) {
-        const data = await res.json();
-        setServices(data);
-      }
+      if (res.ok) setServices(await res.json());
     } catch (err) {
       console.error(err);
     } finally {
@@ -67,24 +64,9 @@ export default function HomeScreen() {
     }
   };
 
-  const handleOrder = (item: PersonalService) => {
-    Alert.alert(
-      "Đặt Dịch Vụ Handmade",
-      `${item.name}\n\nGiá: ${Number(item.price).toLocaleString()}đ\nThời gian làm: ~${item.duration_minutes} phút\n\nBạn muốn đặt ngay hay cần tư vấn thêm?`,
-      [
-        { text: "Tư vấn Zalo", style: "cancel" },
-        {
-          text: "Đặt Ngay",
-          onPress: () =>
-            Alert.alert("Thành công", "Đơn hàng của bạn đã được ghi nhận!"),
-        },
-      ],
-    );
-  };
-
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* HEADER NHẸ NHÀNG */}
+      {/* HERO SECTION */}
       <View style={styles.heroSection}>
         <Text style={styles.subtitle}>Tự tay trao gửi yêu thương</Text>
         <Text style={styles.title}>EIKO HANDMADE</Text>
@@ -97,11 +79,11 @@ export default function HomeScreen() {
           onPress={() => router.push("/explore")}
         >
           <Ionicons name="bag-handle-outline" size={20} color="#fff" />
-          <Text style={styles.shopBtnText}>Mua Nguyên Liệu</Text>
+          <Text style={styles.shopBtnText}>Xem Sản Phẩm</Text>
         </TouchableOpacity>
       </View>
 
-      {/* DANH SÁCH DỊCH VỤ */}
+      {/* SERVICE LIST */}
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>🔥 Dịch Vụ Hot Trend</Text>
         <Text style={styles.sectionSub}>Nhỏ xinh, ý nghĩa, giá hạt dẻ</Text>
@@ -120,44 +102,35 @@ export default function HomeScreen() {
           contentContainerStyle={styles.listContent}
           renderItem={({ item }) => (
             <View style={styles.card}>
-              {/* Ảnh chính */}
               <Image
                 source={{ uri: item.image }}
                 style={styles.cardImg}
                 resizeMode="cover"
               />
-
-              {/* Badge danh mục nổi trên ảnh */}
               <View style={styles.badge}>
                 <Text style={styles.badgeText}>
                   {getCategoryLabel(item.category)}
                 </Text>
               </View>
-
-              {/* Nội dung thẻ */}
               <View style={styles.cardBody}>
                 <Text style={styles.cardName} numberOfLines={2}>
                   {item.name}
                 </Text>
-
-                <View style={styles.metaRow}>
-                  <Ionicons name="time-outline" size={14} color="#9ca3af" />
-                  <Text style={styles.metaText}>
-                    {item.duration_minutes} làm
-                  </Text>
-                </View>
-
                 <Text style={styles.cardDesc} numberOfLines={2}>
                   {item.description}
                 </Text>
-
                 <View style={styles.footerRow}>
                   <Text style={styles.price}>
                     ₺{Number(item.price).toLocaleString()}
                   </Text>
                   <TouchableOpacity
                     style={styles.orderBtn}
-                    onPress={() => handleOrder(item)}
+                    onPress={() =>
+                      Alert.alert(
+                        "Đặt hàng",
+                        "Tính năng thanh toán sẽ ra mắt sớm!",
+                      )
+                    }
                   >
                     <Text style={styles.orderBtnText}>Đặt</Text>
                   </TouchableOpacity>
@@ -165,39 +138,21 @@ export default function HomeScreen() {
               </View>
             </View>
           )}
-          ListEmptyComponent={
-            <Text style={{ color: "#999", paddingLeft: 16 }}>
-              Chưa có dịch vụ nào.
-            </Text>
-          }
         />
       )}
 
-      {/* LỜI KÊU GỌI HÀNH ĐỘNG CUỐI TRANG */}
-      <View style={styles.ctaSection}>
-        <Text style={styles.ctaTitle}>Bạn có ý tưởng riêng?</Text>
-        <Text style={styles.ctaDesc}>
-          Chúng tôi nhận thiết kế theo yêu cầu (Custom Order).
-        </Text>
-        <TouchableOpacity style={styles.contactBtn}>
-          <Ionicons name="chatbubble-ellipses-outline" size={20} color="#fff" />
-          <Text style={styles.contactBtnText}>Chat với Artisan</Text>
-        </TouchableOpacity>
-      </View>
-
       <View style={styles.footer}>
-        <Text style={styles.footerText}>Made with ❤️ by Eiko Team</Text>
+        <Text style={styles.footerText}>© 2026 Eiko Shop</Text>
       </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fdf2f8" }, // Màu hồng pastel nhạt nền web/app
-
+  container: { flex: 1, backgroundColor: "#fdf2f8" },
   heroSection: {
     padding: 30,
-    backgroundColor: "#fce7f3", // Hồng phấn đậm hơn chút
+    backgroundColor: "#fce7f3",
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
     alignItems: "center",
@@ -211,13 +166,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     textTransform: "uppercase",
   },
-  title: {
-    fontSize: 32,
-    fontWeight: "bold",
-    color: "#be185d",
-    marginTop: 4,
-    fontFamily: "serif",
-  }, // Font serif cho cảm giác vintage
+  title: { fontSize: 32, fontWeight: "bold", color: "#be185d", marginTop: 4 },
   desc: {
     fontSize: 14,
     color: "#831843",
@@ -225,7 +174,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
     maxWidth: 280,
   },
-
   shopBtn: {
     marginTop: 20,
     backgroundColor: "#be185d",
@@ -235,11 +183,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    shadowColor: "#be185d",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 5,
   },
   shopBtnText: { color: "#fff", fontWeight: "bold" },
 
@@ -248,7 +191,6 @@ const styles = StyleSheet.create({
   sectionSub: { fontSize: 13, color: "#6b7280", marginTop: 2 },
 
   listContent: { paddingHorizontal: 20, gap: 16, paddingBottom: 20 },
-
   card: {
     width: 220,
     backgroundColor: "#fff",
@@ -259,8 +201,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 3,
-    borderWidth: 1,
-    borderColor: "#f3f4f6",
   },
   cardImg: { width: "100%", height: 140 },
   badge: {
@@ -271,10 +211,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
   },
   badgeText: { fontSize: 10, fontWeight: "bold", color: "#be185d" },
 
@@ -285,15 +221,12 @@ const styles = StyleSheet.create({
     color: "#1f2937",
     marginBottom: 4,
   },
-  metaRow: { flexDirection: "row", alignItems: "center", marginBottom: 6 },
-  metaText: { fontSize: 11, color: "#9ca3af", marginLeft: 4 },
   cardDesc: {
     fontSize: 12,
     color: "#4b5563",
     lineHeight: 16,
     marginBottom: 10,
   },
-
   footerRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -312,41 +245,6 @@ const styles = StyleSheet.create({
     borderColor: "#fbcfe8",
   },
   orderBtnText: { fontSize: 12, fontWeight: "bold", color: "#be185d" },
-
-  ctaSection: {
-    marginHorizontal: 20,
-    marginTop: 10,
-    marginBottom: 20,
-    padding: 20,
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    borderStyle: "dashed",
-    borderWidth: 2,
-    borderColor: "#fbcfe8",
-    alignItems: "center",
-  },
-  ctaTitle: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#1f2937",
-    marginBottom: 4,
-  },
-  ctaDesc: {
-    fontSize: 13,
-    color: "#6b7280",
-    textAlign: "center",
-    marginBottom: 12,
-  },
-  contactBtn: {
-    backgroundColor: "#1f2937",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  contactBtnText: { color: "#fff", fontWeight: "600", fontSize: 14 },
 
   footer: { padding: 20, alignItems: "center" },
   footerText: { fontSize: 12, color: "#9ca3af" },

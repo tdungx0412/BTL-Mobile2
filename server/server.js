@@ -1,173 +1,407 @@
+import bcrypt from "bcryptjs";
 import cors from "cors";
 import dotenv from "dotenv";
 import express from "express";
-import rateLimit from "express-rate-limit";
 import mysql from "mysql2/promise";
-import NodeCache from "node-cache";
 
 dotenv.config();
 
 const app = express();
 const port = Number(process.env.PORT || 3001);
 
-// --- CẤU HÌNH TỐI ƯU ---
-const cache = new NodeCache({ stdTTL: 300 });
-const limiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 1000,
-  message: { error: "Quá nhiều yêu cầu" },
-});
-
 app.use(cors());
 app.use(express.json({ limit: "50mb" }));
-app.use(limiter);
 
-// --- MYSQL POOL ---
 const pool = mysql.createPool({
   host: process.env.DB_HOST || "localhost",
-  port: Number(process.env.DB_PORT || 3306),
   user: process.env.DB_USER || "root",
   password: process.env.DB_PASSWORD || "",
   database: process.env.DB_NAME || "eiko_shop",
   waitForConnections: true,
   connectionLimit: 10,
-  queueLimit: 0,
-});
-
-// --- HEALTH CHECK ---
-app.get("/api/health", async (_req, res) => {
-  try {
-    await pool.query("SELECT 1");
-    res.json({ ok: true });
-  } catch {
-    res.status(500).json({ ok: false });
-  }
-});
-
-app.get("/", (_req, res) => {
-  res.json({
-    message: "EIko Shop API v5.0 - Products & Personal Handmade Services",
-  });
 });
 
 // ==========================================
-//          QUẢN LÝ SẢN PHẨM (PRODUCTS)
+//          AUTHENTICATION
 // ==========================================
-// (Giữ nguyên toàn bộ CRUD sản phẩm từ tin nhắn trước)
-
-app.get("/api/products", async (req, res) => {
-  const cacheKey = `products_${JSON.stringify(req.query)}`;
-  const cachedData = cache.get(cacheKey);
-  if (cachedData) return res.json(cachedData);
-
+app.post("/api/auth/login", async (req, res) => {
+  const { username, password } = req.body;
   try {
-    const page = Math.max(1, parseInt(req.query.page) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
-    const offset = (page - 1) * limit;
+    const [rows] = await pool.query("SELECT * FROM users WHERE username = ?", [
+      username,
+    ]);
+    if (rows.length === 0)
+      return res.status(401).json({ message: "Sai TK/MK" });
 
-    const [rows] = await pool.query(
-      `SELECT id, sku, name, price, image, color, category, description, origin, material, dimensions, weight, stock, rating, review_count AS reviewCount, care_instructions AS careInstructions, package_contents AS packageContents, warranty, shipping_info AS shippingInfo, \`usage\`, tags, is_featured AS isFeatured FROM products ORDER BY is_featured DESC, name ASC LIMIT ? OFFSET ?`,
-      [limit, offset],
-    );
+    const user = rows[0];
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) return res.status(401).json({ message: "Sai TK/MK" });
 
-    const products = rows.map((p) => ({
-      ...p,
-      tags: typeof p.tags === "string" ? JSON.parse(p.tags) : p.tags,
-      reviewCount: Number(p.reviewCount ?? 0),
-      isFeatured: Boolean(p.isFeatured),
-    }));
-    const responseData = {
-      data: products,
-      pagination: { page, limit, total: rows.length },
-    };
-    cache.set(cacheKey, responseData);
-    res.json(responseData);
+    res.json({
+      id: user.id,
+      username: user.username,
+      full_name: user.full_name,
+      role: user.role,
+    });
   } catch (error) {
-    console.error(error);
     res.status(500).json({ message: "Lỗi server" });
   }
 });
 
-app.get("/api/products/search", async (req, res) => {
-  const { keyword } = req.query;
-  if (!keyword) return res.json([]);
+app.post("/api/auth/register", async (req, res) => {
+  const { username, password, full_name } = req.body;
+  if (!username || !password)
+    return res.status(400).json({ message: "Thiếu thông tin" });
+
   try {
-    const [rows] = await pool.query(
-      `SELECT * FROM products WHERE name LIKE ? OR sku LIKE ?`,
-      [`%${keyword}%`, `%${keyword}%`],
+    const [existing] = await pool.query(
+      "SELECT id FROM users WHERE username = ?",
+      [username],
     );
-    res.json(rows);
+    if (existing.length > 0)
+      return res.status(409).json({ message: "Tên đăng nhập đã tồn tại" });
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const [result] = await pool.query(
+      "INSERT INTO users (username, password, full_name, role) VALUES (?, ?, ?, ?)",
+      [username, hashedPassword, full_name || username, "user"],
+    );
+    res
+      .status(201)
+      .json({ id: result.insertId, message: "Đăng ký thành công" });
   } catch (error) {
-    res.status(500).json({ message: "Lỗi tìm kiếm" });
+    res.status(500).json({ message: "Lỗi server" });
   }
 });
 
-app.post("/api/products", async (req, res) => {
-  /* ... giữ nguyên logic thêm SP ... */ res
-    .status(201)
-    .json({ message: "OK" });
-});
-app.put("/api/products/:id", async (req, res) => {
-  /* ... giữ nguyên logic sửa SP ... */ res.json({ message: "OK" });
-});
-app.delete("/api/products/:id", async (req, res) => {
-  /* ... giữ nguyên logic xóa SP ... */ res.json({ message: "OK" });
-});
-
 // ==========================================
-//      DỊCH VỤ CÁ NHÂN HÓA (PERSONAL SERVICES)
+//      SẢN PHẨM & DỊCH VỤ (PUBLIC)
 // ==========================================
 
-// ✅ API MỚI: LẤY DANH SÁCH DỊCH VỤ HANDMADE/DIY
-app.get("/api/personal-services", async (req, res) => {
+// ✅ API Lấy sản phẩm (Tắt Cache để đồng bộ real-time)
+app.get("/api/products", async (req, res) => {
+  res.set("Cache-Control", "no-store, max-age=0"); // Không cho trình duyệt cache
   try {
-    // Lấy tất cả dịch vụ đang active, sắp xếp ngẫu nhiên để tạo cảm giác mới mẻ mỗi lần mở app
+    const [rows] = await pool.query(
+      "SELECT * FROM products WHERE is_active = TRUE ORDER BY created_at DESC",
+    );
+    res.json(rows);
+  } catch (error) {
+    res.status(500).json({ message: "Lỗi tải SP" });
+  }
+});
+
+// ✅ API Lấy dịch vụ (Tắt Cache)
+app.get("/api/personal-services", async (req, res) => {
+  res.set("Cache-Control", "no-store, max-age=0");
+  try {
     const [rows] = await pool.query(
       "SELECT * FROM personal_services WHERE is_active = TRUE ORDER BY RAND()",
     );
     res.json(rows);
   } catch (error) {
-    console.error("Lỗi tải dịch vụ cá nhân:", error);
-    res.status(500).json({ message: "Lỗi server khi tải danh sách dịch vụ" });
+    res.status(500).json({ message: "Lỗi tải dịch vụ" });
   }
 });
 
-// ✅ API CHI TIẾT 1 DỊCH VỤ
-app.get("/api/personal-services/:id", async (req, res) => {
+// ==========================================
+//      ADMIN CRUD: SẢN PHẨM (PRODUCTS)
+// ==========================================
+
+app.post("/api/admin/products", async (req, res) => {
+  const { name, price, category, stock, image, description } = req.body;
+  if (!name || !price)
+    return res.status(400).json({ message: "Thiếu tên hoặc giá" });
+
+  try {
+    const cleanPrice = parseFloat(String(price).replace(/[^0-9.-]+/g, ""));
+    const cleanStock = parseInt(stock) || 0;
+
+    const [result] = await pool.query(
+      "INSERT INTO products (sku, name, price, category, stock, image, description) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      [
+        `SP-${Date.now()}`,
+        name,
+        cleanPrice,
+        category || "Khác",
+        cleanStock,
+        image || "",
+        description || "",
+      ],
+    );
+    res.json({ id: result.insertId, message: "Thêm sản phẩm thành công" });
+  } catch (error) {
+    console.error("Lỗi thêm SP:", error);
+    res.status(500).json({ message: "Lỗi server: " + error.message });
+  }
+});
+
+app.put("/api/admin/products/:id", async (req, res) => {
   const { id } = req.params;
+  const { name, price, stock, description, image } = req.body;
+
+  try {
+    const cleanPrice = parseFloat(String(price).replace(/[^0-9.-]+/g, ""));
+    const cleanStock = parseInt(stock) || 0;
+
+    await pool.query(
+      "UPDATE products SET name=?, price=?, stock=?, description=?, image=? WHERE id=?",
+      [name, cleanPrice, cleanStock, description, image || "", id],
+    );
+    res.json({ message: "Cập nhật thành công" });
+  } catch (error) {
+    res.status(500).json({ message: "Lỗi server: " + error.message });
+  }
+});
+
+app.delete("/api/admin/products/:id", async (req, res) => {
+  try {
+    await pool.query("DELETE FROM products WHERE id=?", [req.params.id]);
+    res.json({ message: "Đã xóa" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// ==========================================
+//      ADMIN CRUD: DỊCH VỤ (SERVICES)
+// ==========================================
+
+app.get("/api/admin/services", async (req, res) => {
   try {
     const [rows] = await pool.query(
-      "SELECT * FROM personal_services WHERE id = ?",
-      [id],
+      "SELECT * FROM personal_services ORDER BY created_at DESC",
     );
-    if (rows.length === 0)
-      return res.status(404).json({ message: "Không tìm thấy dịch vụ" });
-    res.json(rows[0]);
+    res.json(rows);
   } catch (error) {
-    res.status(500).json({ message: "Lỗi server" });
+    res.status(500).json({ message: "Lỗi tải dịch vụ" });
+  }
+});
+
+app.post("/api/admin/services", async (req, res) => {
+  const { name, price, image, description, category, duration_minutes } =
+    req.body;
+  if (!name || !price)
+    return res.status(400).json({ message: "Thiếu thông tin" });
+
+  try {
+    const cleanPrice = parseFloat(String(price).replace(/[^0-9.-]+/g, ""));
+    const [result] = await pool.query(
+      "INSERT INTO personal_services (name, price, image, description, category, duration_minutes) VALUES (?, ?, ?, ?, ?, ?)",
+      [
+        name,
+        cleanPrice,
+        image || "",
+        description || "",
+        category || "packaging",
+        duration_minutes || 30,
+      ],
+    );
+    res.json({ id: result.insertId, message: "Thêm dịch vụ thành công" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+app.put("/api/admin/services/:id", async (req, res) => {
+  const { id } = req.params;
+  const { name, price, image, description, category, duration_minutes } =
+    req.body;
+  try {
+    const cleanPrice = parseFloat(String(price).replace(/[^0-9.-]+/g, ""));
+    await pool.query(
+      "UPDATE personal_services SET name=?, price=?, image=?, description=?, category=?, duration_minutes=? WHERE id=?",
+      [
+        name,
+        cleanPrice,
+        image || "",
+        description || "",
+        category,
+        duration_minutes,
+        id,
+      ],
+    );
+    res.json({ message: "Cập nhật thành công" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+app.delete("/api/admin/services/:id", async (req, res) => {
+  try {
+    await pool.query("DELETE FROM personal_services WHERE id=?", [
+      req.params.id,
+    ]);
+    res.json({ message: "Đã xóa" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
 });
 
 // ==========================================
-//              AUTHENTICATION
+//      ADMIN: THỐNG KÊ & BÁO CÁO & KHÁCH HÀNG
 // ==========================================
 
-app.post("/api/auth/register", async (req, res) => {
-  /* ... giữ nguyên logic đăng ký ... */ res
-    .status(201)
-    .json({ message: "Đăng ký thành công" });
-});
-app.post("/api/auth/login", async (req, res) => {
-  /* ... giữ nguyên logic đăng nhập ... */ res.json({
-    id: 1,
-    username: "test",
-    role: "user",
-  });
+app.get("/api/admin/orders", async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT o.id, o.customer_name, o.total_amount, o.created_at, 
+             GROUP_CONCAT(CONCAT(p.name, ' x ', oi.quantity)) as details
+      FROM orders o
+      JOIN order_items oi ON o.id = oi.order_id
+      JOIN products p ON oi.product_id = p.id
+      GROUP BY o.id
+      ORDER BY o.created_at DESC LIMIT 50
+    `);
+    res.json(rows);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 });
 
-// KHỞI ĐỘNG SERVER
-app.listen(port, () => {
-  console.log(`✅ Server Running: http://localhost:${port}`);
-  console.log(`📦 Products: /api/products`);
-  console.log(`✂️ Personal Services: /api/personal-services`);
+app.get("/api/admin/revenue/daily", async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      "SELECT SUM(total_amount) as revenue, COUNT(*) as count FROM orders WHERE DATE(created_at) = CURDATE()",
+    );
+    res.json(rows[0]);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 });
+
+app.get("/api/admin/customers", async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      "SELECT id, username, full_name, created_at FROM users WHERE role = 'user' ORDER BY created_at DESC",
+    );
+    res.json(rows);
+  } catch (error) {
+    res.status(500).json({ message: "Lỗi tải danh sách khách hàng" });
+  }
+});
+
+app.get("/api/admin/customers/:userId/orders", async (req, res) => {
+  const { userId } = req.params;
+  try {
+    const [rows] = await pool.query(
+      `SELECT o.id, o.created_at, o.total_amount, 
+              GROUP_CONCAT(CONCAT(p.name, ' x ', oi.quantity)) as summary
+       FROM orders o
+       JOIN order_items oi ON o.id = oi.order_id
+       JOIN products p ON oi.product_id = p.id
+       WHERE o.user_id = ? 
+       GROUP BY o.id
+       ORDER BY o.created_at DESC`,
+      [userId],
+    );
+    res.json(rows);
+  } catch (error) {
+    res.status(500).json({ message: "Lỗi tải hóa đơn khách hàng" });
+  }
+});
+
+// ==========================================
+//      KHÁCH HÀNG: THANH TOÁN & LỊCH SỬ
+// ==========================================
+
+app.post("/api/orders/create", async (req, res) => {
+  const { items, user_id } = req.body;
+  if (!items || items.length === 0)
+    return res.status(400).json({ message: "Giỏ hàng trống" });
+
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    let totalAmount = 0;
+    const orderDetails = [];
+
+    for (const item of items) {
+      const [prodRows] = await conn.query(
+        "SELECT id, name, price, stock FROM products WHERE id = ?",
+        [item.product_id],
+      );
+      if (prodRows.length === 0)
+        throw new Error(`SP ID ${item.product_id} không tồn tại`);
+
+      const prod = prodRows[0];
+      if (prod.stock < item.quantity)
+        throw new Error(`SP "${prod.name}" hết hàng`);
+
+      totalAmount += prod.price * item.quantity;
+      orderDetails.push({ ...item, price: prod.price, name: prod.name });
+    }
+
+    const [orderResult] = await conn.query(
+      "INSERT INTO orders (customer_name, user_id, total_amount, status) VALUES (?, ?, ?, 'completed')",
+      ["Khách Online", user_id || null, totalAmount],
+    );
+    const orderId = orderResult.insertId;
+
+    for (const item of orderDetails) {
+      await conn.query(
+        "INSERT INTO order_items (order_id, product_id, quantity, price_at_purchase) VALUES (?, ?, ?, ?)",
+        [orderId, item.product_id, item.quantity, item.price],
+      );
+      await conn.query("UPDATE products SET stock = stock - ? WHERE id = ?", [
+        item.quantity,
+        item.product_id,
+      ]);
+    }
+
+    await conn.commit();
+    res.json({ message: "Đặt hàng thành công!", orderId, totalAmount });
+  } catch (error) {
+    await conn.rollback();
+    res.status(400).json({ message: error.message });
+  } finally {
+    conn.release();
+  }
+});
+
+app.get("/api/my-orders", async (req, res) => {
+  const { userId } = req.query;
+  if (!userId) return res.status(400).json({ message: "Thiếu userId" });
+
+  try {
+    const [rows] = await pool.query(
+      `SELECT o.id, o.created_at, o.total_amount, 
+              GROUP_CONCAT(CONCAT(p.name, ' x ', oi.quantity)) as summary
+       FROM orders o
+       JOIN order_items oi ON o.id = oi.order_id
+       JOIN products p ON oi.product_id = p.id
+       WHERE o.user_id = ? 
+       GROUP BY o.id
+       ORDER BY o.created_at DESC LIMIT 20`,
+      [userId],
+    );
+    res.json(rows);
+  } catch (error) {
+    res.status(500).json({ message: "Lỗi tải lịch sử" });
+  }
+});
+
+app.get("/api/orders/:id", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const [orderRows] = await pool.query("SELECT * FROM orders WHERE id = ?", [
+      id,
+    ]);
+    if (orderRows.length === 0)
+      return res.status(404).json({ message: "Không tìm thấy" });
+
+    const [itemRows] = await pool.query(
+      `SELECT p.name, p.image, oi.quantity, oi.price_at_purchase as price
+       FROM order_items oi JOIN products p ON oi.product_id = p.id WHERE oi.order_id = ?`,
+      [id],
+    );
+
+    res.json({ ...orderRows[0], items: itemRows });
+  } catch (error) {
+    res.status(500).json({ message: "Lỗi tải chi tiết" });
+  }
+});
+
+app.listen(port, () =>
+  console.log(`✅ Server Eiko Shop Pro: http://localhost:${port}`),
+);

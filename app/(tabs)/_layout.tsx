@@ -1,12 +1,83 @@
 // app/(tabs)/_layout.tsx
 import { Ionicons } from "@expo/vector-icons";
-import { Tabs } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Tabs, usePathname } from "expo-router";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, View } from "react-native";
+
+// ✅ BIẾN CẤP MODULE (TOP-LEVEL)
+// Theo tài liệu React: Dùng để cache dữ liệu tránh fetch liên tục.
+let cachedRole: string | null = null;
 
 export default function TabLayout() {
+  const [role, setRole] = useState<string | null>(cachedRole);
+  const [isLoaded, setIsLoaded] = useState(!!cachedRole);
+  const pathname = usePathname();
+
+  // Hàm kiểm tra role (có thể gọi lại khi cần thiết)
+  const checkRole = async () => {
+    try {
+      const json = await AsyncStorage.getItem("userToken");
+      if (json) {
+        const user = JSON.parse(json);
+        cachedRole = user.role; // Cập nhật cache
+        setRole(user.role); // Cập nhật state
+      } else {
+        cachedRole = "user";
+        setRole("user");
+      }
+    } catch (e) {
+      cachedRole = "user";
+      setRole("user");
+    } finally {
+      setIsLoaded(true);
+    }
+  };
+
+  // ✅ KHỞI TẠO 1 LẦN (INITIALIZING THE APP)
+  useEffect(() => {
+    if (!cachedRole) {
+      checkRole();
+    } else {
+      setIsLoaded(true);
+    }
+  }, []);
+
+  // ✅ QUAN TRỌNG: LẮNG NGHE SỰ THAY ĐỔI ĐƯỜNG DẪN
+  // Mỗi khi chuyển tab hoặc đăng nhập xong (đường dẫn thay đổi),
+  // ta kiểm tra lại role để đảm bảo tab Admin hiện/ẩn đúng lúc.
+  // Đây là cách "synchronize with external system" (AsyncStorage) an toàn.
+  useEffect(() => {
+    // Chỉ check lại nếu chưa có cache hoặc đang ở trang login/account
+    if (!cachedRole || pathname === "/auth/login" || pathname === "/account") {
+      checkRole();
+    }
+  }, [pathname]);
+
+  if (!isLoaded) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: "#fff",
+        }}
+      >
+        <ActivityIndicator color="#d97706" size="large" />
+      </View>
+    );
+  }
+
+  // ✅ LOGIC ẨN/HIỆN TAB
+  // Nếu role là admin -> href undefined (hiện).
+  // Nếu role là user -> href null (ẩn hoàn toàn).
+  const adminTabHref = role === "admin" ? undefined : null;
+
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: "#d97706", // Màu cam chủ đạo
+        tabBarActiveTintColor: "#d97706",
         headerShown: false,
         tabBarStyle: {
           backgroundColor: "#fff",
@@ -19,7 +90,6 @@ export default function TabLayout() {
         tabBarLabelStyle: { fontSize: 12, fontWeight: "600" },
       }}
     >
-      {/* Trang Chủ */}
       <Tabs.Screen
         name="index"
         options={{
@@ -30,7 +100,6 @@ export default function TabLayout() {
         }}
       />
 
-      {/* Sản Phẩm */}
       <Tabs.Screen
         name="explore"
         options={{
@@ -41,9 +110,18 @@ export default function TabLayout() {
         }}
       />
 
-      {/* ✅ ĐÃ XÓA TAB NHÂN VIÊN Ở ĐÂY */}
+      {/* TAB ADMIN: Chỉ hiện khi role === 'admin' */}
+      <Tabs.Screen
+        name="admin"
+        options={{
+          href: adminTabHref,
+          title: "Quản lý",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="settings-sharp" size={size} color={color} />
+          ),
+        }}
+      />
 
-      {/* Tài Khoản */}
       <Tabs.Screen
         name="account"
         options={{
