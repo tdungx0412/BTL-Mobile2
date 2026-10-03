@@ -19,6 +19,7 @@ export const useLogout = () => {
             // Dùng replace để xóa history, tránh user bấm back quay lại app
             router.replace("/auth/login");
           } catch (error) {
+            console.error("Logout error:", error);
             Alert.alert("Lỗi", "Không thể đăng xuất, vui lòng thử lại");
           }
         },
@@ -27,4 +28,19 @@ export const useLogout = () => {
   };
 
   return logout;
+};
+
+// ADDITIONAL HOOK: Check authentication status
+export const useCheckAuth = () => {
+  const checkAuth = async (): Promise<boolean> => {
+    try {
+      const token = await AsyncStorage.getItem("userToken");
+      return !!token;
+    } catch (err) {
+      console.error("Check auth error:", err);
+      return false;
+    }
+  };
+
+  return checkAuth;
 };

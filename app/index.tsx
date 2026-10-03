@@ -10,9 +10,15 @@ export default function Index() {
 
   useEffect(() => {
     const check = async () => {
-      const token = await AsyncStorage.getItem("userToken");
-      setIsLoggedIn(!!token);
-      setChecking(false);
+      try {
+        const token = await AsyncStorage.getItem("userToken");
+        setIsLoggedIn(!!token);
+      } catch (err) {
+        console.error("Error checking auth:", err);
+        setIsLoggedIn(false);
+      } finally {
+        setChecking(false);
+      }
     };
     check();
   }, []);

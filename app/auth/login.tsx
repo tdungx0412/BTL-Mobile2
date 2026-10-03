@@ -3,12 +3,12 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001/api";
@@ -20,7 +20,7 @@ export default function LoginScreen() {
   const router = useRouter();
 
   const handleLogin = async () => {
-    if (!username || !password) {
+    if (!username.trim() || !password.trim()) {
       Alert.alert("Thiếu thông tin", "Vui lòng nhập tên đăng nhập và mật khẩu");
       return;
     }
@@ -30,18 +30,35 @@ export default function LoginScreen() {
       const res = await fetch(`${API_URL}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username: username.trim(), password }),
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message);
 
-      await AsyncStorage.setItem("userToken", JSON.stringify(data));
+      if (!res.ok) {
+        throw new Error(data.message || "Đăng nhập thất bại");
+      }
+
+      // CHỈ LƯU USER INFO CẦN THIẾT, KHÔNG LƯU TOÀN BỘ RESPONSE
+      const userData = {
+        token: data.token,
+        user_id: data.user_id,
+        username: data.username,
+        full_name: data.full_name,
+        role: data.role,
+      };
+
+      await AsyncStorage.setItem("userToken", JSON.stringify(userData));
+      await AsyncStorage.setItem("userData", JSON.stringify(userData));
 
       // Chuyển vào app chính sau khi login thành công
       router.replace("/(tabs)");
     } catch (err: any) {
-      Alert.alert("Đăng nhập thất bại", err.message);
+      console.error("Login error:", err);
+      Alert.alert(
+        "Đăng nhập thất bại",
+        err.message || "Không thể kết nối đến server",
+      );
     } finally {
       setLoading(false);
     }
@@ -80,6 +97,7 @@ export default function LoginScreen() {
           marginBottom: 16,
         }}
         autoCapitalize="none"
+        autoComplete="username"
       />
 
       <TextInput
@@ -94,13 +112,14 @@ export default function LoginScreen() {
           padding: 12,
           marginBottom: 24,
         }}
+        autoComplete="current-password"
       />
 
       <TouchableOpacity
         onPress={handleLogin}
         disabled={loading}
         style={{
-          backgroundColor: "#d97706",
+          backgroundColor: loading ? "#a8a8a8" : "#d97706",
           padding: 14,
           borderRadius: 8,
           alignItems: "center",
