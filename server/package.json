@@ -17,6 +17,7 @@
     "multer": "^2.4.0",
     "mysql2": "^3.24.5",
     "node-cache": "^5.1.2",
+    "nodemailer": "^10.0.15",
     "nodemon": "^3.1.14"
   },
   "description": "",

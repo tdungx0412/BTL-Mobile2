@@ -11,6 +11,7 @@ import categoryRoutes from "./src/modules/categories/category.routes.js";
 import voucherRoutes from "./src/modules/vouchers/voucher.routes.js";
 import { OrderService } from "./src/modules/orders/order.service.js";
 import { CraftService } from "./src/modules/services/service.service.js";
+import { sendResetPasswordEmail } from "./src/utils/mailer.js";
 
 dotenv.config();
 
@@ -153,21 +154,33 @@ const handleGuestLogin = async (req, res) => {
 };
 
 const handleRegister = async (req, res) => {
-  const { username, password, full_name } = req.body || {};
+  const { username, password, full_name, email, phone } = req.body || {};
   const cleanUsername = username ? String(username).trim() : "";
   const cleanPassword = password ? String(password).trim() : "";
-  const cleanFullName = full_name ? String(full_name).trim() : "";
+  const cleanFullName = full_name ? String(full_name).trim() : cleanUsername;
+  const cleanEmail = email ? String(email).trim().toLowerCase() : "";
+  const cleanPhone = phone ? String(phone).trim() : null;
 
   if (!cleanUsername || !cleanPassword) {
     return res.status(400).json({ message: "Vui lòng điền tên đăng nhập và mật khẩu" });
   }
 
-  if (cleanUsername.length < 3) {
-    return res.status(400).json({ message: "Tên đăng nhập phải có ít nhất 3 ký tự" });
+  if (cleanUsername.length < 4) {
+    return res.status(400).json({ message: "Tên đăng nhập phải có ít nhất 4 ký tự" });
   }
 
-  if (cleanPassword.length < 4) {
-    return res.status(400).json({ message: "Mật khẩu phải có ít nhất 4 ký tự" });
+  if (cleanPassword.length < 6) {
+    return res.status(400).json({ message: "Mật khẩu phải có ít nhất 6 ký tự" });
+  }
+
+  // Bắt buộc phải có Gmail/Email
+  if (!cleanEmail) {
+    return res.status(400).json({ message: "Vui lòng nhập địa chỉ Gmail để đăng ký tài khoản" });
+  }
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(cleanEmail)) {
+    return res.status(400).json({ message: "Địa chỉ Gmail không đúng định dạng (VD: example@gmail.com)" });
   }
 
   try {
@@ -179,42 +192,231 @@ const handleRegister = async (req, res) => {
       return res.status(409).json({ message: "Tên đăng nhập đã tồn tại, vui lòng chọn tên khác" });
     }
 
+    const [existingEmail] = await pool.query(
+      "SELECT id FROM users WHERE LOWER(email) = LOWER(?)",
+      [cleanEmail]
+    );
+    if (existingEmail.length > 0) {
+      return res.status(409).json({ message: "Địa chỉ Gmail này đã được sử dụng cho tài khoản khác" });
+    }
+
     const hashedPassword = await bcrypt.hash(cleanPassword, 10);
     const [result] = await pool.query(
-      "INSERT INTO users (username, password, full_name, role) VALUES (?, ?, ?, ?)",
-      [cleanUsername, hashedPassword, cleanFullName || `Khách hàng ${cleanUsername}`, "user"]
+      "INSERT INTO users (username, password, full_name, email, phone, role) VALUES (?, ?, ?, ?, ?, 'user')",
+      [cleanUsername, hashedPassword, cleanFullName || `Khách hàng ${cleanUsername}`, cleanEmail, cleanPhone]
     );
-    res.status(201).json({ id: result.insertId, message: "Đăng ký thành công" });
+    res.status(201).json({
+      id: result.insertId,
+      username: cleanUsername,
+      full_name: cleanFullName,
+      email: cleanEmail,
+      message: "Đăng ký tài khoản thành công!",
+    });
   } catch (error) {
     console.error("❌ Register Server Error:", error);
     res.status(500).json({ message: "Lỗi máy chủ khi tạo tài khoản" });
   }
 };
 
-// Đăng ký cả 2 route để phòng trường hợp frontend gọi có hoặc không có tiền tố /api
+const handleForgotPassword = async (req, res) => {
+  const { email } = req.body || {};
+  const cleanEmail = email ? String(email).trim().toLowerCase() : "";
+
+  if (!cleanEmail) {
+    return res.status(400).json({ message: "Vui lòng nhập địa chỉ Gmail của bạn" });
+  }
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(cleanEmail)) {
+    return res.status(400).json({ message: "Địa chỉ Gmail không đúng định dạng" });
+  }
+
+  try {
+    const [rows] = await pool.query(
+      "SELECT id, username, full_name, email FROM users WHERE LOWER(email) = LOWER(?) LIMIT 1",
+      [cleanEmail]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({
+        message: `Không tìm thấy tài khoản nào gắn với Gmail: ${cleanEmail}. Vui lòng kiểm tra lại!`,
+      });
+    }
+
+    const user = rows[0];
+    const randomSuffix = Math.floor(100000 + Math.random() * 900000);
+    const newPassword = `Eiko${randomSuffix}`;
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    await pool.query("UPDATE users SET password = ? WHERE id = ?", [hashedPassword, user.id]);
+
+    const mailResult = await sendResetPasswordEmail(
+      cleanEmail,
+      newPassword,
+      user.username,
+      user.full_name
+    );
+
+    console.log(`✅ [FORGOT PASSWORD] Đã cấp lại mật khẩu cho '${user.username}' (Gmail: ${cleanEmail}): ${newPassword}`);
+
+    return res.status(200).json({
+      success: true,
+      message: "Mật khẩu mới đã được khởi tạo và gửi thành công!",
+      newPassword,
+      emailSent: mailResult.success,
+      email: cleanEmail,
+      username: user.username,
+    });
+  } catch (error) {
+    console.error("❌ Forgot Password Error:", error);
+    return res.status(500).json({ message: "Lỗi máy chủ khi đặt lại mật khẩu" });
+  }
+};
+
+const handleUpdateProfile = async (req, res) => {
+  const { userId, full_name, email, phone, new_password, avatar } = req.body || {};
+  const id = userId || req.body?.id;
+
+  if (!id) {
+    return res.status(400).json({ message: "Thiếu thông tin mã người dùng" });
+  }
+
+  try {
+    const [users] = await pool.query("SELECT * FROM users WHERE id = ?", [id]);
+    if (users.length === 0) {
+      return res.status(404).json({ message: "Không tìm thấy người dùng" });
+    }
+    const current = users[0];
+
+    const cleanFullName = full_name !== undefined ? String(full_name).trim() : current.full_name;
+    const cleanEmail = email !== undefined ? String(email).trim().toLowerCase() : current.email;
+    const cleanPhone = phone !== undefined ? String(phone).trim() : current.phone;
+    const cleanAvatar = avatar !== undefined ? String(avatar).trim() : current.avatar;
+
+    if (!cleanFullName) {
+      return res.status(400).json({ message: "Họ và tên không được để trống" });
+    }
+
+    if (cleanEmail) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(cleanEmail)) {
+        return res.status(400).json({ message: "Địa chỉ Gmail không đúng định dạng" });
+      }
+
+      const [dup] = await pool.query(
+        "SELECT id FROM users WHERE LOWER(email) = LOWER(?) AND id != ?",
+        [cleanEmail, id]
+      );
+      if (dup.length > 0) {
+        return res.status(409).json({ message: "Địa chỉ Gmail này đã được người dùng khác sử dụng" });
+      }
+    }
+
+    let passwordClause = "";
+    let params = [cleanFullName, cleanEmail || null, cleanPhone || null, cleanAvatar || null];
+
+    if (new_password && String(new_password).trim().length > 0) {
+      const cleanNewPassword = String(new_password).trim();
+      if (cleanNewPassword.length < 4) {
+        return res.status(400).json({ message: "Mật khẩu mới phải có ít nhất 4 ký tự" });
+      }
+      const hashed = await bcrypt.hash(cleanNewPassword, 10);
+      passwordClause = ", password = ?";
+      params.push(hashed);
+    }
+
+    params.push(id);
+    await pool.query(
+      `UPDATE users SET full_name = ?, email = ?, phone = ?, avatar = ? ${passwordClause} WHERE id = ?`,
+      params
+    );
+
+    const [updated] = await pool.query(
+      "SELECT id, username, full_name, email, phone, avatar, role, created_at FROM users WHERE id = ?",
+      [id]
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Cập nhật thông tin tài khoản thành công!",
+      user: updated[0],
+    });
+  } catch (error) {
+    console.error("❌ Update Profile Error:", error);
+    return res.status(500).json({ message: "Lỗi máy chủ khi cập nhật thông tin" });
+  }
+};
+
+// Đăng ký các route xác thực & tài khoản
 app.post("/api/auth/login", handleLogin);
 app.post("/auth/login", handleLogin);
 app.post("/api/auth/guest", handleGuestLogin);
 app.post("/auth/guest", handleGuestLogin);
 app.post("/api/auth/register", handleRegister);
 app.post("/auth/register", handleRegister);
+app.post("/api/auth/forgot-password", handleForgotPassword);
+app.post("/auth/forgot-password", handleForgotPassword);
+app.put("/api/auth/profile", handleUpdateProfile);
+app.put("/auth/profile", handleUpdateProfile);
+
 
 // ==========================================
 //      SẢN PHẨM & DỊCH VỤ (PUBLIC)
 // ==========================================
 
-// ✅ API Lấy sản phẩm (Tắt Cache để đồng bộ real-time)
-app.get("/api/products", async (req, res) => {
-  res.set("Cache-Control", "no-store, max-age=0"); // Không cho trình duyệt cache
+// ✅ API Lấy sản phẩm & Chi tiết sản phẩm (Tắt Cache để đồng bộ real-time)
+const handleGetAllProducts = async (req, res) => {
+  res.set("Cache-Control", "no-store, max-age=0");
   try {
     const [rows] = await pool.query(
-      "SELECT * FROM products WHERE is_active = TRUE ORDER BY created_at DESC",
+      `SELECT p.*, c.name AS category_name, c.icon AS category_icon
+       FROM products p
+       LEFT JOIN categories c ON p.category_id = c.id
+       WHERE p.is_active = TRUE ORDER BY p.created_at DESC`
     );
     res.json(rows);
   } catch (error) {
-    res.status(500).json({ message: "Lỗi tải SP" });
+    console.error("Lỗi lấy danh sách sản phẩm:", error);
+    res.status(500).json({ message: "Lỗi tải sản phẩm" });
   }
-});
+};
+
+const handleGetProductDetail = async (req, res) => {
+  res.set("Cache-Control", "no-store, max-age=0");
+  const { id } = req.params;
+  try {
+    const [rows] = await pool.query(
+      `SELECT p.*, c.name AS category_name, c.icon AS category_icon
+       FROM products p
+       LEFT JOIN categories c ON p.category_id = c.id
+       WHERE p.id = ? AND p.is_active = TRUE`,
+      [id]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ message: "Không tìm thấy sản phẩm" });
+    }
+    const product = rows[0];
+    const [images] = await pool.query(
+      "SELECT id, image_url, is_thumbnail, display_order FROM product_images WHERE product_id = ? ORDER BY display_order ASC",
+      [id]
+    ).catch(() => [[]]);
+    product.gallery = images || [];
+
+    const [variants] = await pool.query(
+      "SELECT id, variant_name, sku, price_adjustment, stock FROM product_variants WHERE product_id = ?",
+      [id]
+    ).catch(() => [[]]);
+    product.variants = variants || [];
+
+    res.json(product);
+  } catch (error) {
+    console.error("Lỗi lấy chi tiết sản phẩm:", error);
+    res.status(500).json({ message: "Lỗi tải chi tiết sản phẩm" });
+  }
+};
+
+app.get(["/api/products", "/products"], handleGetAllProducts);
+app.get(["/api/products/:id", "/products/:id"], handleGetProductDetail);
 
 app.get(["/api/personal-services", "/personal-services"], async (req, res) => {
   res.set("Cache-Control", "no-store, max-age=0");
@@ -225,6 +427,29 @@ app.get(["/api/personal-services", "/personal-services"], async (req, res) => {
     res.json(rows);
   } catch (error) {
     res.status(500).json({ message: "Lỗi tải dịch vụ" });
+  }
+});
+
+app.get(["/api/personal-services/:id", "/personal-services/:id", "/api/services/:id", "/services/:id"], async (req, res) => {
+  try {
+    const { id } = req.params;
+    let [rows] = await pool.query(
+      "SELECT * FROM personal_services WHERE id = ?",
+      [id]
+    );
+    if (!rows || rows.length === 0) {
+      [rows] = await pool.query(
+        "SELECT * FROM services WHERE id = ?",
+        [id]
+      );
+    }
+    if (!rows || rows.length === 0) {
+      return res.status(404).json({ message: "Không tìm thấy dịch vụ" });
+    }
+    res.json(rows[0]);
+  } catch (error) {
+    console.error("Lỗi lấy chi tiết dịch vụ:", error);
+    res.status(500).json({ message: "Lỗi tải chi tiết dịch vụ" });
   }
 });
 
@@ -320,6 +545,31 @@ const handleUpdateServiceBookingStatus = async (req, res) => {
 
 app.put("/api/admin/service-bookings/:id/status", handleUpdateServiceBookingStatus);
 app.put("/admin/service-bookings/:id/status", handleUpdateServiceBookingStatus);
+
+const handleGetTodayBookingReminders = async (req, res) => {
+  const userId = req.query.userId || req.query.user_id;
+  const role = req.query.role || "customer";
+  let ids = [];
+  if (req.query.ids) {
+    ids = req.query.ids.split(",").map(Number).filter(Boolean);
+  }
+
+  try {
+    const bookings = await CraftService.getDueBookings(userId, { role, ids });
+    res.json({
+      success: true,
+      count: bookings.length,
+      bookings,
+    });
+  } catch (error) {
+    console.error("Lỗi lấy thông báo lịch hẹn hôm nay:", error);
+    res.status(500).json({ message: "Lỗi kiểm tra lịch hẹn hôm nay" });
+  }
+};
+
+app.get("/api/service-bookings/today-reminders", handleGetTodayBookingReminders);
+app.get("/service-bookings/today-reminders", handleGetTodayBookingReminders);
+
 
 // ==========================================
 //      ADMIN CRUD: SẢN PHẨM (PRODUCTS)

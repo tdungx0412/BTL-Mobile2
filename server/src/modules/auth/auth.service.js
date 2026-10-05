@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { pool } from "../../config/db.js";
 import { ENV } from "../../config/env.js";
+import { sendResetPasswordEmail } from "../../utils/mailer.js";
 
 export class AuthService {
   static async login(username, password) {
@@ -120,9 +121,11 @@ export class AuthService {
   }
 
   static async register({ username, password, full_name, email, phone }) {
-    const cleanUsername = String(username).trim();
-    const cleanPassword = String(password).trim();
+    const cleanUsername = String(username || "").trim();
+    const cleanPassword = String(password || "").trim();
     const cleanFullName = full_name ? String(full_name).trim() : cleanUsername;
+    const cleanEmail = email ? String(email).trim().toLowerCase() : "";
+    const cleanPhone = phone ? String(phone).trim() : null;
 
     if (cleanUsername.length < 4) {
       throw { status: 400, message: "Tên đăng nhập phải có ít nhất 4 ký tự" };
@@ -131,25 +134,143 @@ export class AuthService {
       throw { status: 400, message: "Mật khẩu phải có ít nhất 6 ký tự" };
     }
 
-    const [existing] = await pool.query(
+    // Bắt buộc phải có Gmail/Email
+    if (!cleanEmail) {
+      throw { status: 400, message: "Vui lòng nhập địa chỉ Gmail/Email để đăng ký" };
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(cleanEmail)) {
+      throw { status: 400, message: "Địa chỉ Gmail không đúng định dạng (VD: example@gmail.com)" };
+    }
+
+    const [existingUser] = await pool.query(
       "SELECT id FROM users WHERE username = ? OR LOWER(username) = LOWER(?)",
       [cleanUsername, cleanUsername]
     );
-    if (existing.length > 0) {
+    if (existingUser.length > 0) {
       throw { status: 409, message: "Tên đăng nhập đã tồn tại, vui lòng chọn tên khác" };
+    }
+
+    const [existingEmail] = await pool.query(
+      "SELECT id FROM users WHERE LOWER(email) = LOWER(?)",
+      [cleanEmail]
+    );
+    if (existingEmail.length > 0) {
+      throw { status: 409, message: "Địa chỉ Gmail này đã được sử dụng cho tài khoản khác" };
     }
 
     const hashedPassword = await bcrypt.hash(cleanPassword, 10);
     const [result] = await pool.query(
-      "INSERT INTO users (username, password, full_name, email, phone, role) VALUES (?, ?, ?, ?, ?, ?)",
-      [cleanUsername, hashedPassword, cleanFullName, email || null, phone || null, "customer"]
+      "INSERT INTO users (username, password, full_name, email, phone, role) VALUES (?, ?, ?, ?, ?, 'user')",
+      [cleanUsername, hashedPassword, cleanFullName, cleanEmail, cleanPhone]
     );
 
     return {
       id: result.insertId,
       username: cleanUsername,
       full_name: cleanFullName,
+      email: cleanEmail,
+      phone: cleanPhone,
     };
+  }
+
+  static async forgotPassword(email) {
+    const cleanEmail = String(email || "").trim().toLowerCase();
+    if (!cleanEmail) {
+      throw { status: 400, message: "Vui lòng nhập địa chỉ Gmail" };
+    }
+
+    const [rows] = await pool.query(
+      "SELECT id, username, full_name, email FROM users WHERE LOWER(email) = LOWER(?) LIMIT 1",
+      [cleanEmail]
+    );
+
+    if (rows.length === 0) {
+      throw {
+        status: 404,
+        message: `Không tìm thấy tài khoản nào khớp với Gmail: ${cleanEmail}. Vui lòng kiểm tra lại!`,
+      };
+    }
+
+    const user = rows[0];
+    const randomSuffix = Math.floor(100000 + Math.random() * 900000);
+    const newPassword = `Eiko${randomSuffix}`;
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    await pool.query("UPDATE users SET password = ? WHERE id = ?", [hashedPassword, user.id]);
+
+    const mailResult = await sendResetPasswordEmail(cleanEmail, newPassword, user.username, user.full_name);
+
+    return {
+      success: true,
+      message: "Mật khẩu mới đã được khởi tạo thành công!",
+      newPassword,
+      emailSent: mailResult.success,
+      email: cleanEmail,
+      username: user.username,
+    };
+  }
+
+  static async updateProfile(userId, { full_name, email, phone, avatar, new_password }) {
+    if (!userId) {
+      throw { status: 400, message: "Thiếu thông tin người dùng" };
+    }
+
+    const [users] = await pool.query("SELECT * FROM users WHERE id = ?", [userId]);
+    if (users.length === 0) {
+      throw { status: 404, message: "Không tìm thấy thông tin tài khoản" };
+    }
+    const current = users[0];
+
+    const cleanFullName = full_name !== undefined ? String(full_name).trim() : current.full_name;
+    const cleanEmail = email !== undefined ? String(email).trim().toLowerCase() : current.email;
+    const cleanPhone = phone !== undefined ? String(phone).trim() : current.phone;
+    const cleanAvatar = avatar !== undefined ? String(avatar).trim() : current.avatar;
+
+    if (!cleanFullName) {
+      throw { status: 400, message: "Họ và tên không được để trống" };
+    }
+
+    if (cleanEmail) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(cleanEmail)) {
+        throw { status: 400, message: "Địa chỉ Gmail không đúng định dạng" };
+      }
+
+      const [dup] = await pool.query(
+        "SELECT id FROM users WHERE LOWER(email) = LOWER(?) AND id != ?",
+        [cleanEmail, userId]
+      );
+      if (dup.length > 0) {
+        throw { status: 409, message: "Địa chỉ Gmail này đã được người dùng khác sử dụng" };
+      }
+    }
+
+    let passwordClause = "";
+    let params = [cleanFullName, cleanEmail || null, cleanPhone || null, cleanAvatar || null];
+
+    if (new_password && String(new_password).trim().length > 0) {
+      const cleanNewPassword = String(new_password).trim();
+      if (cleanNewPassword.length < 4) {
+        throw { status: 400, message: "Mật khẩu mới phải có ít nhất 4 ký tự" };
+      }
+      const hashed = await bcrypt.hash(cleanNewPassword, 10);
+      passwordClause = ", password = ?";
+      params.push(hashed);
+    }
+
+    params.push(userId);
+    await pool.query(
+      `UPDATE users SET full_name = ?, email = ?, phone = ?, avatar = ? ${passwordClause} WHERE id = ?`,
+      params
+    );
+
+    const [updated] = await pool.query(
+      "SELECT id, username, full_name, email, phone, avatar, role, created_at FROM users WHERE id = ?",
+      [userId]
+    );
+
+    return updated[0];
   }
 
   static async getProfile(userId) {
@@ -163,3 +284,4 @@ export class AuthService {
     return rows[0];
   }
 }
+

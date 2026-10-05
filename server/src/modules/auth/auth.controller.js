@@ -52,4 +52,37 @@ export class AuthController {
       return sendError(res, err.message || "Lỗi tải thông tin", err.status || 500, err);
     }
   }
+
+  static async forgotPassword(req, res) {
+    const { email } = req.body || {};
+    if (!email) {
+      return sendError(res, "Vui lòng nhập địa chỉ Gmail", 400);
+    }
+
+    try {
+      const result = await AuthService.forgotPassword(email);
+      return res.status(200).json(result);
+    } catch (err) {
+      return sendError(res, err.message || "Lỗi khi đặt lại mật khẩu", err.status || 500, err);
+    }
+  }
+
+  static async updateProfile(req, res) {
+    const userId = req.body?.userId || req.user?.id || req.body?.id;
+    if (!userId) {
+      return sendError(res, "Thiếu thông tin người dùng", 400);
+    }
+
+    try {
+      const updatedUser = await AuthService.updateProfile(userId, req.body || {});
+      return res.status(200).json({
+        success: true,
+        message: "Cập nhật thông tin tài khoản thành công",
+        user: updatedUser,
+      });
+    } catch (err) {
+      return sendError(res, err.message || "Lỗi cập nhật thông tin", err.status || 500, err);
+    }
+  }
 }
+

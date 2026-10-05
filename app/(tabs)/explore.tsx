@@ -3,6 +3,7 @@ import { CartDrawer } from "@/components/cart/CartDrawer";
 import { CheckoutModal } from "@/components/order/CheckoutModal";
 import { OrderHistoryModal } from "@/components/order/OrderHistoryModal";
 import { ProductCard, ProductItem } from "@/components/product/ProductCard";
+import { ProductDetailModal } from "@/components/product/ProductDetailModal";
 import { API_URL, BASE_URL } from "@/constants/config";
 import { useAuthStore } from "@/src/stores/useAuthStore";
 import { useCartStore } from "@/src/stores/useCartStore";
@@ -260,138 +261,34 @@ export default function ExploreScreen() {
       />
 
       {/* PRODUCT DETAIL MODAL */}
-      {selectedProduct && (
-        <Modal visible={!!selectedProduct} animationType="slide" transparent>
-          <View style={styles.detailOverlay}>
-            <View style={styles.detailSheet}>
-              <TouchableOpacity
-                style={styles.detailCloseBtn}
-                onPress={() => setSelectedProduct(null)}
-              >
-                <Ionicons name="close" size={24} color="#1f2937" />
-              </TouchableOpacity>
-
-              <ScrollView showsVerticalScrollIndicator={false}>
-                <Image
-                  source={{
-                    uri: selectedProduct.image?.startsWith("http")
-                      ? selectedProduct.image
-                      : `${BASE_URL}${selectedProduct.image}`,
-                  }}
-                  style={styles.detailImg}
-                  resizeMode="cover"
-                />
-
-                <View style={styles.detailBody}>
-                  <Text style={styles.detailCategory}>
-                    {selectedProduct.category_name || selectedProduct.category || "Đồ thủ công"}
-                  </Text>
-                  <Text style={styles.detailTitle}>{selectedProduct.name}</Text>
-                  <Text style={styles.detailPrice}>{formatVND(selectedProduct.price)}</Text>
-
-                  <View style={styles.divider} />
-
-                  <Text style={styles.sectionTitle}>Mô Tả Sản Phẩm</Text>
-                  <Text style={styles.detailDesc}>
-                    {(selectedProduct as any).description ||
-                      "Sản phẩm được chế tác tỉ mỉ bởi các nghệ nhân làng nghề truyền thống Việt Nam. Chất liệu tự nhiên, thân thiện với môi trường."}
-                  </Text>
-
-                  <View style={styles.specBox}>
-                    <Text style={styles.specItem}>
-                      📦 Tồn kho hiện có: <Text style={{ fontWeight: "700" }}>{selectedProduct.stock} món</Text>
-                    </Text>
-                    <Text style={styles.specItem}>
-                      ⭐ Đánh giá: <Text style={{ fontWeight: "700" }}>{selectedProduct.rating || "5.0"} (126 nhận xét)</Text>
-                    </Text>
-                  </View>
-
-                  {/* BỘ CHỌN SỐ LƯỢNG MUA */}
-                  {selectedProduct.stock > 0 && (
-                    <View style={styles.qtyRow}>
-                      <Text style={styles.qtyLabel}>Số lượng đặt mua:</Text>
-                      <View style={styles.qtyControls}>
-                        <TouchableOpacity
-                          style={styles.qtyBtn}
-                          onPress={() => setBuyQuantity((q) => Math.max(1, q - 1))}
-                        >
-                          <Ionicons name="remove" size={18} color="#374151" />
-                        </TouchableOpacity>
-                        <Text style={styles.qtyText}>{buyQuantity}</Text>
-                        <TouchableOpacity
-                          style={styles.qtyBtn}
-                          disabled={buyQuantity >= selectedProduct.stock}
-                          onPress={() => setBuyQuantity((q) => Math.min(selectedProduct.stock, q + 1))}
-                        >
-                          <Ionicons name="add" size={18} color="#374151" />
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  )}
-                </View>
-              </ScrollView>
-
-              <View style={styles.detailFooter}>
-                <View style={styles.btnRowActions}>
-                  <TouchableOpacity
-                    style={[styles.detailAddBtn, selectedProduct.stock <= 0 && { backgroundColor: "#9ca3af" }]}
-                    disabled={selectedProduct.stock <= 0}
-                    onPress={() => {
-                      for (let i = 0; i < buyQuantity; i++) {
-                        useCartStore.getState().addToCart({
-                          id: selectedProduct.id,
-                          name: selectedProduct.name,
-                          price:
-                            typeof selectedProduct.price === "string"
-                              ? parseFloat(selectedProduct.price) || 0
-                              : selectedProduct.price,
-                          stock: selectedProduct.stock,
-                          image: selectedProduct.image?.startsWith("http")
-                            ? selectedProduct.image
-                            : `${BASE_URL}${selectedProduct.image}`,
-                        });
-                      }
-                      setSelectedProduct(null);
-                      setShowCart(true);
-                    }}
-                  >
-                    <Ionicons name="cart" size={18} color="#fff" />
-                    <Text style={styles.detailAddBtnText}>
-                      {selectedProduct.stock <= 0 ? "Hết Hàng" : "Thêm Giỏ"}
-                    </Text>
-                  </TouchableOpacity>
-
-                  {selectedProduct.stock > 0 && (
-                    <TouchableOpacity
-                      style={styles.detailBuyNowBtn}
-                      onPress={() => {
-                        const itemToBuy = {
-                          id: selectedProduct.id,
-                          name: selectedProduct.name,
-                          price:
-                            typeof selectedProduct.price === "string"
-                              ? parseFloat(selectedProduct.price) || 0
-                              : selectedProduct.price,
-                          quantity: buyQuantity,
-                          image: selectedProduct.image?.startsWith("http")
-                            ? selectedProduct.image
-                            : `${BASE_URL}${selectedProduct.image}`,
-                        };
-                        setSelectedProduct(null);
-                        setDirectCheckoutItem(itemToBuy);
-                        setShowDirectCheckout(true);
-                      }}
-                    >
-                      <Ionicons name="flash" size={18} color="#fff" />
-                      <Text style={styles.detailBuyNowBtnText}>Mua Ngay</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
-            </View>
-          </View>
-        </Modal>
-      )}
+      <ProductDetailModal
+        visible={!!selectedProduct}
+        product={selectedProduct}
+        onClose={() => setSelectedProduct(null)}
+        onAddToCart={(p, qty) => {
+          for (let i = 0; i < qty; i++) {
+            useCartStore.getState().addToCart({
+              id: p.id,
+              name: p.name,
+              price: typeof p.price === "string" ? parseFloat(p.price) || 0 : p.price,
+              stock: p.stock,
+              image: p.image || undefined,
+            });
+          }
+          setShowCart(true);
+        }}
+        onBuyNow={(p, qty) => {
+          const itemToBuy = {
+            id: p.id,
+            name: p.name,
+            price: typeof p.price === "string" ? parseFloat(p.price) || 0 : p.price,
+            quantity: qty,
+            image: p.image || undefined,
+          };
+          setDirectCheckoutItem(itemToBuy);
+          setShowDirectCheckout(true);
+        }}
+      />
     </View>
   );
 }

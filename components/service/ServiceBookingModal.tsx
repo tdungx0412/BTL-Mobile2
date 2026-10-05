@@ -1,5 +1,5 @@
-// components/service/ServiceBookingModal.tsx
 import { API_URL } from "@/constants/config";
+import { scheduleBookingReminder } from "@/src/services/notificationService";
 import { useAuthStore } from "@/src/stores/useAuthStore";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -134,7 +134,17 @@ export const ServiceBookingModal: React.FC<ServiceBookingModalProps> = ({
         }
       }
 
+      // 🔔 Tự động lên lịch thông báo về máy vào đúng ngày hẹn dịch vụ
+      scheduleBookingReminder({
+        id: data.id,
+        service_name: service.name,
+        customer_name: customerName.trim(),
+        appointment_date: appointmentDate || new Date().toISOString(),
+        booking_code: data.booking_code || `DV-${data.id}`,
+      });
+
       onSuccess(data.booking_code || `DV-${data.id}`);
+
     } catch (err: any) {
       console.error("Lỗi đặt lịch dịch vụ:", err);
       Alert.alert("Đặt lịch thất bại", err.message || "Không thể kết nối đến máy chủ");

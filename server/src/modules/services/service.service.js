@@ -159,4 +159,38 @@ export class CraftService {
     await pool.query(`UPDATE service_bookings SET status = ? ${paymentUpdate} WHERE id = ?`, [status, bookingId]);
     return { message: "Cập nhật trạng thái dịch vụ thành công" };
   }
+
+  static async getDueBookings(userId, { role, ids } = {}) {
+    const isAdmin = role === "admin";
+    let whereClause = "WHERE DATE(b.appointment_date) = CURDATE() AND b.status NOT IN ('cancelled', 'completed')";
+    const params = [];
+
+    if (!isAdmin) {
+      if (userId) {
+        whereClause += " AND b.user_id = ?";
+        params.push(userId);
+      } else if (Array.isArray(ids) && ids.length > 0) {
+        whereClause += ` AND b.id IN (${ids.map(() => "?").join(",")})`;
+        params.push(...ids);
+      } else {
+        return [];
+      }
+    }
+
+    const [rows] = await pool.query(
+      `SELECT b.*, 
+              COALESCE(ps.name, s.name, 'Dịch vụ handmade') AS service_name, 
+              COALESCE(ps.image, s.image, '') AS service_image, 
+              COALESCE(ps.category, s.category, 'packaging') AS service_category, 
+              COALESCE(ps.duration_minutes, s.duration_minutes, 30) AS duration_minutes
+       FROM service_bookings b
+       LEFT JOIN personal_services ps ON b.service_id = ps.id
+       LEFT JOIN services s ON b.service_id = s.id
+       ${whereClause}
+       ORDER BY b.appointment_date ASC`,
+      params
+    );
+    return rows;
+  }
 }
+

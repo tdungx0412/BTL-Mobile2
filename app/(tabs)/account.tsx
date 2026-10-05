@@ -1,4 +1,6 @@
+import { EditProfileModal } from "@/components/account/EditProfileModal";
 import { OrderHistoryModal } from "@/components/order/OrderHistoryModal";
+import { ServiceBookingHistoryModal } from "@/components/service/ServiceBookingHistoryModal";
 import { StatisticsModal } from "@/components/statistics/StatisticsModal";
 import { API_URL } from "@/constants/config";
 import { useAuthStore } from "@/src/stores/useAuthStore";
@@ -25,16 +27,19 @@ export default function AccountScreen() {
   const { user, isLoading, logout, initAuth } = useAuthStore();
   const [showOrders, setShowOrders] = useState(false);
   const [showStats, setShowStats] = useState(false);
+  const [showEditProfile, setShowEditProfile] = useState(false);
+  const [showServiceBookings, setShowServiceBookings] = useState(false);
   const [orderCount, setOrderCount] = useState(0);
   const [totalSpent, setTotalSpent] = useState(0);
-
   useEffect(() => {
     initAuth();
   }, []);
 
+  const currentUserId = user?.id || user?.user_id;
+
   useEffect(() => {
-    if (user?.id) {
-      fetch(`${API_URL}/orders/my-orders?userId=${user.id}`)
+    if (currentUserId) {
+      fetch(`${API_URL}/orders/my-orders?userId=${currentUserId}`)
         .then((r) => (r.ok ? r.json() : []))
         .then((orders: any[]) => {
           if (Array.isArray(orders)) {
@@ -45,7 +50,7 @@ export default function AccountScreen() {
         })
         .catch(() => {});
     }
-  }, [user?.id, showOrders]);
+  }, [currentUserId, showOrders]);
 
   const handleLogout = () => {
     Alert.alert("Xác nhận đăng xuất", "Bạn có chắc chắn muốn đăng xuất tài khoản?", [
@@ -97,6 +102,23 @@ export default function AccountScreen() {
         <Text style={styles.userName}>{user.full_name || user.username || "Khách Hàng"}</Text>
         <Text style={styles.userHandle}>@{user.username}</Text>
 
+        {/* EMAIL BADGE */}
+        {user.email ? (
+          <View style={styles.emailBadge}>
+            <Ionicons name="mail" size={13} color="#b45309" />
+            <Text style={styles.emailBadgeText}>{user.email}</Text>
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={styles.addEmailBadge}
+            onPress={() => setShowEditProfile(true)}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="add-circle" size={13} color="#d97706" />
+            <Text style={styles.addEmailText}>Cập nhật Gmail bảo mật</Text>
+          </TouchableOpacity>
+        )}
+
         {/* QUICK STATS FOR CUSTOMER */}
         <View style={styles.statsContainer}>
           <View style={styles.statItem}>
@@ -116,26 +138,55 @@ export default function AccountScreen() {
       </View>
 
       {/* ACTIONS */}
-      <Text style={styles.sectionHeader}>Quản Lý Mua Hàng</Text>
+      <Text style={styles.sectionHeader}>Cài Đặt & Quản Lý</Text>
 
-      {/* BUTTON: THỐNG KÊ DOANH THU & KINH DOANH */}
+      {/* BUTTON: THỐNG KÊ DOANH THU & KINH DOANH (CHỈ HIỂN THỊ CHO ADMIN) */}
+      {!isCustomer && (
+        <TouchableOpacity
+          style={[styles.actionCard, styles.statsActionCard]}
+          onPress={() => setShowStats(true)}
+          activeOpacity={0.8}
+        >
+          <View style={[styles.actionIconBox, styles.statsIconBox]}>
+            <Ionicons name="stats-chart" size={24} color="#d97706" />
+          </View>
+          <View style={styles.actionContent}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <Text style={[styles.actionTitle, styles.statsActionTitle]}>Thống Kê & Báo Cáo Doanh Thu</Text>
+              <View style={styles.statsPill}>
+                <Text style={styles.statsPillText}>ADMIN</Text>
+              </View>
+            </View>
+            <Text style={styles.actionDesc}>
+              Biểu đồ doanh thu 7 ngày, tổng đơn, top sản phẩm & tồn kho
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color="#d97706" />
+        </TouchableOpacity>
+      )}
+
+      {/* BUTTON: CHỈNH SỬA THÔNG TIN TÀI KHOẢN (THAY THẾ CHỖ THỐNG KÊ CỦA KHÁCH HÀNG & ADMIN CŨNG CÓ) */}
       <TouchableOpacity
-        style={[styles.actionCard, styles.statsActionCard]}
-        onPress={() => setShowStats(true)}
+        style={[styles.actionCard, isCustomer && styles.customerEditCard]}
+        onPress={() => setShowEditProfile(true)}
         activeOpacity={0.8}
       >
-        <View style={[styles.actionIconBox, styles.statsIconBox]}>
-          <Ionicons name="stats-chart" size={24} color="#d97706" />
+        <View style={[styles.actionIconBox, isCustomer && styles.customerEditIconBox]}>
+          <Ionicons name="person-circle-outline" size={26} color="#d97706" />
         </View>
         <View style={styles.actionContent}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-            <Text style={[styles.actionTitle, styles.statsActionTitle]}>Thống Kê & Báo Cáo Doanh Thu</Text>
-            <View style={styles.statsPill}>
-              <Text style={styles.statsPillText}>HOT</Text>
-            </View>
+            <Text style={[styles.actionTitle, isCustomer && styles.customerEditTitle]}>
+              Chỉnh Sửa Thông Tin Tài Khoản
+            </Text>
+            {isCustomer && (
+              <View style={styles.editPill}>
+                <Text style={styles.editPillText}>HỒ SƠ</Text>
+              </View>
+            )}
           </View>
           <Text style={styles.actionDesc}>
-            Biểu đồ doanh thu 7 ngày, tổng đơn, top sản phẩm & tồn kho
+            Cập nhật họ tên, Gmail ({user.email || "chưa có"}), SĐT & đổi mật khẩu
           </Text>
         </View>
         <Ionicons name="chevron-forward" size={20} color="#d97706" />
@@ -159,6 +210,22 @@ export default function AccountScreen() {
             <Text style={styles.countBadgeText}>{orderCount}</Text>
           </View>
         )}
+        <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+      </TouchableOpacity>
+
+      {/* BUTTON: LỊCH ĐẶT DỊCH VỤ CỦA TÔI */}
+      <TouchableOpacity
+        style={styles.actionCard}
+        onPress={() => setShowServiceBookings(true)}
+        activeOpacity={0.8}
+      >
+        <View style={[styles.actionIconBox, { backgroundColor: "#fdf2f8" }]}>
+          <Ionicons name="sparkles-outline" size={24} color="#be185d" />
+        </View>
+        <View style={styles.actionContent}>
+          <Text style={styles.actionTitle}>Lịch Đặt Dịch Vụ Của Tôi</Text>
+          <Text style={styles.actionDesc}>Theo dõi ngày hẹn gói quà, workshop, viết thiệp</Text>
+        </View>
         <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
       </TouchableOpacity>
 
@@ -187,11 +254,27 @@ export default function AccountScreen() {
       {/* MODAL LỊCH SỬ ĐƠN HÀNG & HÓA ĐƠN */}
       <OrderHistoryModal visible={showOrders} onClose={() => setShowOrders(false)} />
 
-      {/* MODAL THỐNG KÊ DOANH THU & KINH DOANH */}
-      <StatisticsModal visible={showStats} onClose={() => setShowStats(false)} />
+      {/* MODAL LỊCH ĐẶT DỊCH VỤ CỦA TÔI */}
+      <ServiceBookingHistoryModal
+        visible={showServiceBookings}
+        onClose={() => setShowServiceBookings(false)}
+      />
+
+      {/* MODAL THỐNG KÊ DOANH THU & KINH DOANH (CHỈ ADMIN) */}
+      {!isCustomer && (
+        <StatisticsModal visible={showStats} onClose={() => setShowStats(false)} />
+      )}
+
+      {/* MODAL CHỈNH SỬA THÔNG TIN TÀI KHOẢN (CHO CẢ KHÁCH VÀ ADMIN) */}
+      <EditProfileModal
+        visible={showEditProfile}
+        onClose={() => setShowEditProfile(false)}
+      />
     </ScrollView>
   );
 }
+
+
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 18, backgroundColor: "#f3f4f6" },
@@ -388,4 +471,64 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "800",
   },
+  emailBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fffbeb",
+    borderWidth: 1,
+    borderColor: "#fde68a",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+    gap: 6,
+    marginBottom: 14,
+  },
+  emailBadgeText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#92400e",
+  },
+  addEmailBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fef3c7",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+    gap: 4,
+    marginBottom: 14,
+  },
+  addEmailText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#b45309",
+  },
+  customerEditCard: {
+    borderColor: "#fed7aa",
+    backgroundColor: "#fffbf7",
+  },
+  customerEditIconBox: {
+    backgroundColor: "#ffedd5",
+  },
+  customerEditTitle: {
+    color: "#c2410c",
+  },
+  editActionCard: {
+    borderColor: "#e5e7eb",
+  },
+  editIconBox: {
+    backgroundColor: "#fffbeb",
+  },
+  editPill: {
+    backgroundColor: "#ea580c",
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+  },
+  editPillText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "800",
+  },
 });
+

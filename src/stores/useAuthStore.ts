@@ -19,11 +19,12 @@ interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (userData: User, token: string) => Promise<void>;
+  updateUser: (updatedData: Partial<User>) => Promise<void>;
   logout: () => Promise<void>;
   initAuth: () => Promise<void>;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   token: null,
   isAuthenticated: false,
@@ -66,8 +67,25 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ user: normalizedUser, token, isAuthenticated: true });
   },
 
+  updateUser: async (updatedData: Partial<User>) => {
+    const current = get().user;
+    if (!current) return;
+    const merged: User = {
+      ...current,
+      ...updatedData,
+      id: updatedData.id || current.id,
+      user_id: updatedData.user_id || current.user_id,
+    };
+    const token = get().token || "";
+    const storageData = { ...merged, token };
+    await AsyncStorage.setItem("userToken", JSON.stringify(storageData));
+    await AsyncStorage.setItem("userData", JSON.stringify(storageData));
+    set({ user: merged });
+  },
+
   logout: async () => {
     await AsyncStorage.multiRemove(["userToken", "userData", "userCart"]);
     set({ user: null, token: null, isAuthenticated: false });
   },
 }));
+

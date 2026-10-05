@@ -4,7 +4,11 @@ import { CheckoutModal, CheckoutDirectItem } from "@/components/order/CheckoutMo
 import { OrderHistoryModal } from "@/components/order/OrderHistoryModal";
 import { ServiceBookingHistoryModal } from "@/components/service/ServiceBookingHistoryModal";
 import { ServiceBookingModal } from "@/components/service/ServiceBookingModal";
-import { AddServiceModal } from "@/components/service/AddServiceModal";
+import {
+  ServiceDetailModal,
+  resolveServiceImage,
+} from "@/components/service/ServiceDetailModal";
+import { ProductDetailModal } from "@/components/product/ProductDetailModal";
 import { API_URL, BASE_URL } from "@/constants/config";
 import { useAuthStore } from "@/src/stores/useAuthStore";
 import { useCartStore } from "@/src/stores/useCartStore";
@@ -67,10 +71,11 @@ export default function HomeScreen() {
   // Modals
   const [selectedService, setSelectedService] = useState<ServiceItem | null>(null);
   const [bookingModalVisible, setBookingModalVisible] = useState(false);
+  const [selectedServiceForDetail, setSelectedServiceForDetail] = useState<ServiceItem | null>(null);
+  const [serviceDetailModalVisible, setServiceDetailModalVisible] = useState(false);
   const [historyModalVisible, setHistoryModalVisible] = useState(false);
   const [orderModalVisible, setOrderModalVisible] = useState(false);
   const [cartDrawerVisible, setCartDrawerVisible] = useState(false);
-  const [addServiceModalVisible, setAddServiceModalVisible] = useState(false);
 
   // Product Detail & Direct Buy modal
   const [selectedProduct, setSelectedProduct] = useState<ProductItem | null>(null);
@@ -414,33 +419,38 @@ export default function HomeScreen() {
             <Text style={styles.sectionTitle}>Dịch Vụ Cá Nhân & Gói Quà 🎁</Text>
             <Text style={styles.sectionSubtitle}>Gói quà tỉ mỉ, thêu tay và kit sáng tạo</Text>
           </View>
-          <View style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
-            {/* NÚT THÊM DỊCH VỤ */}
-            <TouchableOpacity
-              style={styles.addServiceBtn}
-              onPress={() => setAddServiceModalVisible(true)}
-              activeOpacity={0.85}
-            >
-              <Ionicons name="add-circle" size={15} color="#fff" />
-              <Text style={styles.addServiceBtnText}>Thêm DV</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.seeAllBtn}
-              onPress={() => setHistoryModalVisible(true)}
-            >
-              <Ionicons name="calendar-outline" size={14} color="#d97706" />
-              <Text style={styles.seeAllText}>Lịch của tôi</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            style={styles.seeAllBtn}
+            onPress={() => setHistoryModalVisible(true)}
+          >
+            <Ionicons name="calendar-outline" size={14} color="#d97706" />
+            <Text style={styles.seeAllText}>Lịch của tôi</Text>
+          </TouchableOpacity>
         </View>
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.serviceList}>
           {services.map((item) => (
-            <View key={item.id} style={styles.serviceCard}>
-              <Image source={{ uri: item.image }} style={styles.serviceImg} resizeMode="cover" />
+            <TouchableOpacity
+              key={item.id}
+              style={styles.serviceCard}
+              activeOpacity={0.88}
+              onPress={() => {
+                setSelectedServiceForDetail(item);
+                setServiceDetailModalVisible(true);
+              }}
+            >
+              <Image
+                source={{ uri: resolveServiceImage(item.image) }}
+                style={styles.serviceImg}
+                resizeMode="cover"
+              />
               <View style={styles.serviceCategoryBadge}>
                 <Text style={styles.serviceCategoryText}>{getServiceCategoryLabel(item.category)}</Text>
+              </View>
+
+              <View style={styles.serviceDetailTag}>
+                <Ionicons name="eye-outline" size={11} color="#fff" />
+                <Text style={styles.serviceDetailTagText}>Chi tiết</Text>
               </View>
 
               <View style={styles.serviceBody}>
@@ -468,21 +478,8 @@ export default function HomeScreen() {
                   </TouchableOpacity>
                 </View>
               </View>
-            </View>
+            </TouchableOpacity>
           ))}
-
-          {/* THẺ THÊM DỊCH VỤ NHANH */}
-          <TouchableOpacity
-            style={styles.addServiceQuickCard}
-            onPress={() => setAddServiceModalVisible(true)}
-            activeOpacity={0.8}
-          >
-            <View style={styles.addServiceQuickIconWrap}>
-              <Ionicons name="add" size={26} color="#be185d" />
-            </View>
-            <Text style={styles.addServiceQuickTitle}>+ Thêm Dịch Vụ</Text>
-            <Text style={styles.addServiceQuickSub}>Gói quà, kit DIY...</Text>
-          </TouchableOpacity>
         </ScrollView>
       </View>
 
@@ -555,6 +552,21 @@ export default function HomeScreen() {
         }}
       />
 
+      {/* 3.1 SERVICE DETAIL MODAL */}
+      <ServiceDetailModal
+        visible={serviceDetailModalVisible}
+        service={selectedServiceForDetail}
+        onClose={() => {
+          setServiceDetailModalVisible(false);
+          setSelectedServiceForDetail(null);
+        }}
+        onBook={(serv) => {
+          setServiceDetailModalVisible(false);
+          setSelectedService(serv as ServiceItem);
+          setBookingModalVisible(true);
+        }}
+      />
+
       {/* 4. SERVICE BOOKING HISTORY MODAL */}
       <ServiceBookingHistoryModal
         visible={historyModalVisible}
@@ -576,132 +588,35 @@ export default function HomeScreen() {
         }}
       />
 
-      {/* 6. ADD SERVICE MODAL */}
-      <AddServiceModal
-        visible={addServiceModalVisible}
-        onClose={() => setAddServiceModalVisible(false)}
-        onSuccess={() => {
-          fetchHomeData();
+      {/* 7. PRODUCT DETAIL MODAL */}
+      <ProductDetailModal
+        visible={!!selectedProduct}
+        product={selectedProduct}
+        onClose={() => setSelectedProduct(null)}
+        onAddToCart={(p, qty) => {
+          for (let i = 0; i < qty; i++) {
+            addToCart({
+              id: p.id,
+              name: p.name,
+              price: typeof p.price === "string" ? parseFloat(p.price) || 0 : p.price,
+              stock: p.stock,
+              image: p.image || undefined,
+            });
+          }
+          setCartDrawerVisible(true);
+        }}
+        onBuyNow={(p, qty) => {
+          const itemToBuy: CheckoutDirectItem = {
+            id: p.id,
+            name: p.name,
+            price: typeof p.price === "string" ? parseFloat(p.price) || 0 : p.price,
+            quantity: qty,
+            image: p.image || undefined,
+          };
+          setDirectCheckoutItem(itemToBuy);
+          setDirectCheckoutVisible(true);
         }}
       />
-
-      {/* 7. PRODUCT DETAIL MODAL */}
-      {selectedProduct && (
-        <Modal visible={!!selectedProduct} animationType="slide" transparent>
-          <View style={styles.detailOverlay}>
-            <View style={styles.detailSheet}>
-              <TouchableOpacity
-                style={styles.detailCloseBtn}
-                onPress={() => setSelectedProduct(null)}
-              >
-                <Ionicons name="close" size={24} color="#1f2937" />
-              </TouchableOpacity>
-
-              <ScrollView showsVerticalScrollIndicator={false}>
-                <Image
-                  source={{
-                    uri: selectedProduct.image?.startsWith("http")
-                      ? selectedProduct.image
-                      : `${BASE_URL}${selectedProduct.image}`,
-                  }}
-                  style={styles.detailImg}
-                  resizeMode="cover"
-                />
-
-                <View style={styles.detailBody}>
-                  <Text style={styles.detailCategory}>{selectedProduct.category || "Đồ thủ công"}</Text>
-                  <Text style={styles.detailTitle}>{selectedProduct.name}</Text>
-                  <Text style={styles.detailPrice}>{formatVND(selectedProduct.price)}</Text>
-
-                  <View style={styles.divider} />
-
-                  <Text style={styles.detailDescTitle}>Mô Tả Sản Phẩm</Text>
-                  <Text style={styles.detailDesc}>
-                    {selectedProduct.description ||
-                      "Sản phẩm được chế tác thủ công tỉ mỉ bởi các nghệ nhân làng nghề truyền thống. Chất liệu mộc tự nhiên, thân thiện với môi trường."}
-                  </Text>
-
-                  {/* SỐ LƯỢNG */}
-                  {selectedProduct.stock > 0 && (
-                    <View style={styles.qtyBox}>
-                      <Text style={styles.qtyLabel}>Số lượng đặt mua:</Text>
-                      <View style={styles.qtyControls}>
-                        <TouchableOpacity
-                          style={styles.qtyBtn}
-                          onPress={() => setProductBuyQty((q) => Math.max(1, q - 1))}
-                        >
-                          <Ionicons name="remove" size={18} color="#374151" />
-                        </TouchableOpacity>
-                        <Text style={styles.qtyVal}>{productBuyQty}</Text>
-                        <TouchableOpacity
-                          style={styles.qtyBtn}
-                          disabled={productBuyQty >= selectedProduct.stock}
-                          onPress={() => setProductBuyQty((q) => Math.min(selectedProduct.stock, q + 1))}
-                        >
-                          <Ionicons name="add" size={18} color="#374151" />
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  )}
-                </View>
-              </ScrollView>
-
-              <View style={styles.detailFooter}>
-                <View style={{ flexDirection: "row", gap: 10 }}>
-                  <TouchableOpacity
-                    style={styles.modalAddCartBtn}
-                    onPress={() => {
-                      for (let i = 0; i < productBuyQty; i++) {
-                        addToCart({
-                          id: selectedProduct.id,
-                          name: selectedProduct.name,
-                          price:
-                            typeof selectedProduct.price === "string"
-                              ? parseFloat(selectedProduct.price) || 0
-                              : selectedProduct.price,
-                          stock: selectedProduct.stock,
-                          image: selectedProduct.image?.startsWith("http")
-                            ? selectedProduct.image
-                            : `${BASE_URL}${selectedProduct.image}`,
-                        });
-                      }
-                      setSelectedProduct(null);
-                      setCartDrawerVisible(true);
-                    }}
-                  >
-                    <Ionicons name="cart" size={18} color="#fff" />
-                    <Text style={styles.modalAddCartBtnText}>Thêm Vào Giỏ</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.modalBuyNowBtn}
-                    onPress={() => {
-                      const itemToBuy: CheckoutDirectItem = {
-                        id: selectedProduct.id,
-                        name: selectedProduct.name,
-                        price:
-                          typeof selectedProduct.price === "string"
-                            ? parseFloat(selectedProduct.price) || 0
-                            : selectedProduct.price,
-                        quantity: productBuyQty,
-                        image: selectedProduct.image?.startsWith("http")
-                          ? selectedProduct.image
-                          : `${BASE_URL}${selectedProduct.image}`,
-                      };
-                      setSelectedProduct(null);
-                      setDirectCheckoutItem(itemToBuy);
-                      setDirectCheckoutVisible(true);
-                    }}
-                  >
-                    <Ionicons name="flash" size={18} color="#fff" />
-                    <Text style={styles.modalBuyNowBtnText}>Mua Ngay</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          </View>
-        </Modal>
-      )}
     </ScrollView>
   );
 }
@@ -1138,6 +1053,23 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: "#b45309",
   },
+  serviceDetailTag: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    backgroundColor: "rgba(0, 0, 0, 0.55)",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  serviceDetailTagText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#fff",
+  },
   serviceBody: {
     padding: 12,
   },
@@ -1393,62 +1325,5 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 14,
     fontWeight: "800",
-  },
-  addServiceBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    backgroundColor: "#be185d",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    shadowColor: "#be185d",
-    shadowOpacity: 0.25,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  addServiceBtnText: {
-    color: "#fff",
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  addServiceQuickCard: {
-    width: 140,
-    height: 240,
-    backgroundColor: "#fdf2f8",
-    borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: "#fbcfe8",
-    borderStyle: "dashed",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 12,
-    marginRight: 14,
-  },
-  addServiceQuickIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "#fff",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 8,
-    elevation: 2,
-    shadowColor: "#be185d",
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-  },
-  addServiceQuickTitle: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#be185d",
-    textAlign: "center",
-  },
-  addServiceQuickSub: {
-    fontSize: 11,
-    color: "#9ca3af",
-    textAlign: "center",
-    marginTop: 2,
   },
 });

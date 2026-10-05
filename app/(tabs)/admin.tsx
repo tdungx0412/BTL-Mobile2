@@ -1,6 +1,10 @@
 import { API_URL, BASE_URL } from "@/constants/config";
 import { AddServiceModal } from "@/components/service/AddServiceModal";
+import { ServiceDetailModal } from "@/components/service/ServiceDetailModal";
 import { AdminOrderDetailModal } from "@/components/order/AdminOrderDetailModal";
+import { StatisticsModal } from "@/components/statistics/StatisticsModal";
+import { EditProfileModal } from "@/components/account/EditProfileModal";
+import { TodayServiceReminderModal } from "@/components/service/TodayServiceReminderModal";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import React, { useEffect, useState } from "react";
@@ -62,6 +66,11 @@ const getServiceCatBadge = (cat: string) => {
 
 export default function AdminScreen() {
   const [activeTab, setActiveTab] = useState<"orders" | "products" | "services">("orders");
+  const [showStatsModal, setShowStatsModal] = useState(false);
+  const [showEditProfileModal, setShowEditProfileModal] = useState(false);
+  const [showTodayDueModal, setShowTodayDueModal] = useState(false);
+
+
 
   // ================= STATE QUẢN LÝ DỊCH VỤ =================
   // 1. Quản lý danh mục dịch vụ hiển thị
@@ -73,6 +82,8 @@ export default function AdminScreen() {
   const [editingService, setEditingService] = useState<any | null>(null);
   const [visibleServiceModal, setVisibleServiceModal] = useState(false);
   const [deletingServiceId, setDeletingServiceId] = useState<number | null>(null);
+  const [selectedServiceForDetail, setSelectedServiceForDetail] = useState<any | null>(null);
+  const [showServiceDetailModal, setShowServiceDetailModal] = useState(false);
 
   // 2. Quản lý lịch hẹn đặt dịch vụ từ khách
   const [serviceBookings, setServiceBookings] = useState<any[]>([]);
@@ -505,6 +516,21 @@ export default function AdminScreen() {
   const pendingServiceCount = serviceBookings.filter((b) => b.status === "pending").length;
   const inProgressServiceCount = serviceBookings.filter((b) => b.status === "in_progress").length;
 
+  const todayDueBookings = serviceBookings.filter((b) => {
+    if (!b.appointment_date || b.status === "cancelled" || b.status === "completed") return false;
+    try {
+      const appt = new Date(b.appointment_date);
+      const now = new Date();
+      return (
+        appt.getFullYear() === now.getFullYear() &&
+        appt.getMonth() === now.getMonth() &&
+        appt.getDate() === now.getDate()
+      );
+    } catch {
+      return false;
+    }
+  });
+
   return (
     <View style={s.container}>
       {/* HEADER QUẢN TRỊ */}
@@ -554,8 +580,55 @@ export default function AdminScreen() {
         )}
       </View>
 
+      {/* THANH CÔNG CỤ NHANH: THỐNG KÊ & CHỈNH SỬA TÀI KHOẢN ADMIN */}
+      <View style={s.adminQuickBar}>
+        <TouchableOpacity
+          style={s.adminQuickBtnStats}
+          onPress={() => setShowStatsModal(true)}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="stats-chart" size={15} color="#b45309" />
+          <Text style={s.adminQuickBtnStatsText}>Báo Cáo & Thống Kê</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={s.adminQuickBtnProfile}
+          onPress={() => setShowEditProfileModal(true)}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="person-circle-outline" size={17} color="#1f2937" />
+          <Text style={s.adminQuickBtnProfileText}>Sửa Tài Khoản Admin</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* BANNER THÔNG BÁO LỊCH HẸN HÔM NAY CHO ADMIN */}
+      {todayDueBookings.length > 0 && (
+        <TouchableOpacity
+          style={s.todayAlertBanner}
+          onPress={() => setShowTodayDueModal(true)}
+          activeOpacity={0.8}
+        >
+          <View style={s.todayAlertIcon}>
+            <Ionicons name="notifications" size={18} color="#fff" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={s.todayAlertTitle}>
+              🔔 Hôm nay có {todayDueBookings.length} lịch hẹn dịch vụ!
+            </Text>
+            <Text style={s.todayAlertDesc}>
+              Nhấn để xem danh sách khách và chuẩn bị đón tiếp
+            </Text>
+          </View>
+          <View style={s.todayAlertBadge}>
+            <Text style={s.todayAlertBadgeText}>{todayDueBookings.length} ĐƠN</Text>
+          </View>
+        </TouchableOpacity>
+      )}
+
       {/* SEGMENTED TAB BAR */}
       <View style={s.segmentRow}>
+
+
         <TouchableOpacity
           style={[s.segmentBtn, activeTab === "orders" && s.segmentBtnActive]}
           onPress={() => setActiveTab("orders")}
@@ -1076,8 +1149,20 @@ export default function AdminScreen() {
                             </Text>
                           ) : null}
 
-                          {/* ACTION BUTTONS (SỬA & XÓA) */}
+                          {/* ACTION BUTTONS (XEM, SỬA & XÓA) */}
                           <View style={s.prodActions}>
+                            <TouchableOpacity
+                              style={s.btnDetailHint}
+                              onPress={() => {
+                                setSelectedServiceForDetail(item);
+                                setShowServiceDetailModal(true);
+                              }}
+                              activeOpacity={0.8}
+                            >
+                              <Ionicons name="eye-outline" size={13} color="#b45309" />
+                              <Text style={s.btnDetailHintText}>Xem</Text>
+                            </TouchableOpacity>
+
                             <TouchableOpacity
                               style={s.btnEditProd}
                               onPress={() => handleOpenEditServiceModal(item)}
@@ -1453,6 +1538,16 @@ export default function AdminScreen() {
         editingService={editingService}
       />
 
+      {/* ================= MODAL CHI TIẾT DỊCH VỤ ADMIN ================= */}
+      <ServiceDetailModal
+        visible={showServiceDetailModal}
+        service={selectedServiceForDetail}
+        onClose={() => {
+          setShowServiceDetailModal(false);
+          setSelectedServiceForDetail(null);
+        }}
+      />
+
       {/* ================= MODAL CHI TIẾT ĐƠN HÀNG ADMIN ================= */}
       <AdminOrderDetailModal
         visible={visibleOrderDetailModal}
@@ -1466,9 +1561,34 @@ export default function AdminScreen() {
           fetchAdminOrders();
         }}
       />
+
+      {/* ================= MODAL THỐNG KÊ DOANH THU & KINH DOANH CHO ADMIN ================= */}
+      <StatisticsModal
+        visible={showStatsModal}
+        onClose={() => setShowStatsModal(false)}
+      />
+
+      {/* ================= MODAL CHỈNH SỬA THÔNG TIN TÀI KHOẢN ADMIN ================= */}
+      <EditProfileModal
+        visible={showEditProfileModal}
+        onClose={() => setShowEditProfileModal(false)}
+      />
+
+      {/* ================= MODAL LỊCH HẸN HÔM NAY CHO ADMIN ================= */}
+      <TodayServiceReminderModal
+        visible={showTodayDueModal}
+        onClose={() => setShowTodayDueModal(false)}
+        bookings={todayDueBookings}
+        isAdmin={true}
+        onOpenHistory={() => {
+          setActiveTab("services");
+          setServiceSubTab("bookings");
+        }}
+      />
     </View>
   );
 }
+
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f3f4f6" },
@@ -1484,7 +1604,91 @@ const s = StyleSheet.create({
   },
   headerTitle: { fontSize: 20, fontWeight: "800", color: "#1f2937" },
   headerSub: { fontSize: 12, color: "#6b7280", marginTop: 2 },
+  todayAlertBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fffbeb",
+    borderWidth: 1.5,
+    borderColor: "#fde68a",
+    borderRadius: 12,
+    marginHorizontal: 16,
+    marginBottom: 10,
+    padding: 10,
+    gap: 10,
+  },
+  todayAlertIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "#d97706",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  todayAlertTitle: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#92400e",
+  },
+  todayAlertDesc: {
+    fontSize: 11,
+    color: "#b45309",
+    marginTop: 1,
+  },
+  todayAlertBadge: {
+    backgroundColor: "#ea580c",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  todayAlertBadgeText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "900",
+  },
+  adminQuickBar: {
+
+    flexDirection: "row",
+    backgroundColor: "#fff",
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+    gap: 10,
+  },
+  adminQuickBtnStats: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: "#fffbeb",
+    borderWidth: 1,
+    borderColor: "#fde68a",
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  adminQuickBtnStatsText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#b45309",
+  },
+  adminQuickBtnProfile: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: "#f9fafb",
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  adminQuickBtnProfileText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#374151",
+  },
   btnAddProduct: {
+
     flexDirection: "row",
     alignItems: "center",
     gap: 4,

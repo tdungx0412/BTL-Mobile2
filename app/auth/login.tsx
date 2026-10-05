@@ -1,4 +1,5 @@
 // app/auth/login.tsx
+import { ForgotPasswordModal } from "@/components/auth/ForgotPasswordModal";
 import { API_URL } from "@/constants/config";
 import { useAuthStore } from "@/src/stores/useAuthStore";
 import { Ionicons } from "@expo/vector-icons";
@@ -22,7 +23,9 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [guestLoading, setGuestLoading] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const router = useRouter();
+
 
   const handleLogin = async () => {
     if (!username.trim() || !password.trim()) {
@@ -177,6 +180,17 @@ export default function LoginScreen() {
           </View>
         </View>
 
+        {/* FORGOT PASSWORD LINK */}
+        <View style={styles.forgotPasswordRow}>
+          <TouchableOpacity
+            onPress={() => setShowForgotPassword(true)}
+            activeOpacity={0.7}
+            style={{ paddingVertical: 4 }}
+          >
+            <Text style={styles.forgotPasswordText}>Quên mật khẩu?</Text>
+          </TouchableOpacity>
+        </View>
+
         {/* LOGIN BUTTON */}
         <TouchableOpacity
           onPress={handleLogin}
@@ -224,13 +238,24 @@ export default function LoginScreen() {
           style={styles.registerLink}
         >
           <Text style={styles.registerLinkText}>
-            Đăng ký tài khoản đầy đủ (Họ tên, SĐT)
+            Chưa có tài khoản? <Text style={{ color: "#d97706", fontWeight: "700" }}>Đăng ký ngay với Gmail</Text>
           </Text>
         </TouchableOpacity>
       </ScrollView>
+
+      {/* MODAL QUÊN MẬT KHẨU QUA GMAIL */}
+      <ForgotPasswordModal
+        visible={showForgotPassword}
+        onClose={() => setShowForgotPassword(false)}
+        onSuccess={(uname, newPw) => {
+          if (uname) setUsername(uname);
+          if (newPw) setPassword(newPw);
+        }}
+      />
     </KeyboardAvoidingView>
   );
 }
+
 
 const styles = StyleSheet.create({
   container: {
@@ -372,4 +397,15 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     textDecorationLine: "underline",
   },
+  forgotPasswordRow: {
+    alignItems: "flex-end",
+    marginBottom: 14,
+    marginTop: -4,
+  },
+  forgotPasswordText: {
+    color: "#d97706",
+    fontSize: 13,
+    fontWeight: "700",
+  },
 });
+
