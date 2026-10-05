@@ -8,10 +8,12 @@
     "start": "node server.js"
   },
   "dependencies": {
+    "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
     "dotenv": "^16.6.1",
     "express": "^4.22.3",
     "express-rate-limit": "^8.7.0",
+    "jsonwebtoken": "^9.0.3",
     "multer": "^2.4.0",
     "mysql2": "^3.24.5",
     "node-cache": "^5.1.2",

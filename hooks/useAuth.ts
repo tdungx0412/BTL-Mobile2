@@ -14,9 +14,7 @@ export const useLogout = () => {
         style: "destructive",
         onPress: async () => {
           try {
-            await AsyncStorage.removeItem("userToken");
-            await AsyncStorage.removeItem("userData");
-            // Dùng replace để xóa history, tránh user bấm back quay lại app
+            await AsyncStorage.multiRemove(["userToken", "userData", "userCart"]);
             router.replace("/auth/login");
           } catch (error) {
             console.error("Logout error:", error);

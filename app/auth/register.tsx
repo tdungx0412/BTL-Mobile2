@@ -1,4 +1,4 @@
-// app/auth/register.tsx
+import { API_URL } from "@/constants/config";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
@@ -10,8 +10,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-
-const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001/api";
 
 export default function RegisterScreen() {
   const [username, setUsername] = useState("");
@@ -28,7 +26,7 @@ export default function RegisterScreen() {
       return false;
     }
 
-    if (username.length < 4) {
+    if (username.trim().length < 4) {
       Alert.alert("Lỗi", "Tên đăng nhập phải có ít nhất 4 ký tự");
       return false;
     }
@@ -71,20 +69,25 @@ export default function RegisterScreen() {
         }),
       });
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.message || "Đăng ký thất bại");
+      let data: any = {};
+      try {
+        data = await res.json();
+      } catch (e) {
+        throw new Error(`Máy chủ phản hồi lỗi (${res.status}). Vui lòng thử lại sau.`);
       }
 
-      Alert.alert("Thành công", "Đăng ký thành công! Vui lòng đăng nhập.", [
-        { text: "OK", onPress: () => router.replace("/auth/login") },
+      if (!res.ok) {
+        throw new Error(data.message || `Đăng ký thất bại (${res.status})`);
+      }
+
+      Alert.alert("Thành công 🎉", "Đăng ký tài khoản thành công! Vui lòng đăng nhập.", [
+        { text: "Đăng nhập ngay", onPress: () => router.replace("/auth/login") },
       ]);
     } catch (err: any) {
       console.error("Register error:", err);
       Alert.alert(
         "Đăng ký thất bại",
-        err.message || "Không thể kết nối đến server",
+        err.message || "Không thể kết nối đến máy chủ",
       );
     } finally {
       setLoading(false);
@@ -117,6 +120,7 @@ export default function RegisterScreen() {
 
         <TextInput
           placeholder="Tên đăng nhập (ít nhất 4 ký tự)"
+          placeholderTextColor="#9ca3af"
           value={username}
           onChangeText={setUsername}
           style={{
@@ -125,6 +129,8 @@ export default function RegisterScreen() {
             borderRadius: 8,
             padding: 12,
             marginBottom: 16,
+            color: "#1f2937",
+            backgroundColor: "#ffffff",
           }}
           autoCapitalize="none"
           autoComplete="username"
@@ -132,6 +138,7 @@ export default function RegisterScreen() {
 
         <TextInput
           placeholder="Họ và tên"
+          placeholderTextColor="#9ca3af"
           value={fullName}
           onChangeText={setFullName}
           style={{
@@ -140,11 +147,14 @@ export default function RegisterScreen() {
             borderRadius: 8,
             padding: 12,
             marginBottom: 16,
+            color: "#1f2937",
+            backgroundColor: "#ffffff",
           }}
         />
 
         <TextInput
           placeholder="Mật khẩu (ít nhất 6 ký tự)"
+          placeholderTextColor="#9ca3af"
           value={password}
           onChangeText={setPassword}
           secureTextEntry
@@ -154,12 +164,15 @@ export default function RegisterScreen() {
             borderRadius: 8,
             padding: 12,
             marginBottom: 16,
+            color: "#1f2937",
+            backgroundColor: "#ffffff",
           }}
           autoComplete="new-password"
         />
 
         <TextInput
           placeholder="Xác nhận mật khẩu"
+          placeholderTextColor="#9ca3af"
           value={confirmPassword}
           onChangeText={setConfirmPassword}
           secureTextEntry
@@ -169,6 +182,8 @@ export default function RegisterScreen() {
             borderRadius: 8,
             padding: 12,
             marginBottom: 24,
+            color: "#1f2937",
+            backgroundColor: "#ffffff",
           }}
           autoComplete="new-password"
         />

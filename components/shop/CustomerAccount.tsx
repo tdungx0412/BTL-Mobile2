@@ -199,7 +199,7 @@ const SEED_VOUCHERS: Voucher[] = [
 /* ================= Component chính ================= */
 
 export function CustomerAccount() {
-  const products = useShopProducts();
+  const { products } = useShopProducts();
 
   const [profile, setProfile] = useState({
     name: "Minh Dũng",
@@ -1363,6 +1363,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     fontSize: 13,
     color: "#172b4d",
+    backgroundColor: "#ffffff",
     marginBottom: 10,
   },
   modalActions: {

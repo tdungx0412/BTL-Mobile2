@@ -27,7 +27,7 @@ const priceToNumber = (price: string) =>
   Number(price.replace(/[^\d]/g, "")) || 0;
 
 export function CustomerExplore() {
-  const products = useShopProducts();
+  const { products } = useShopProducts();
 
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);

@@ -1,14 +1,20 @@
 // app/(tabs)/explore.tsx
+import { CartDrawer } from "@/components/cart/CartDrawer";
+import { CheckoutModal } from "@/components/order/CheckoutModal";
+import { OrderHistoryModal } from "@/components/order/OrderHistoryModal";
+import { ProductCard, ProductItem } from "@/components/product/ProductCard";
+import { API_URL, BASE_URL } from "@/constants/config";
+import { useAuthStore } from "@/src/stores/useAuthStore";
+import { useCartStore } from "@/src/stores/useCartStore";
 import { Ionicons } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useRouter } from "expo-router";
-import { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   FlatList,
   Image,
   Modal,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -17,697 +23,512 @@ import {
   View,
 } from "react-native";
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001/api";
-
-interface Product {
+interface Category {
   id: number;
   name: string;
-  price: number;
-  stock: number;
-  image?: string;
-  category?: string;
-  description?: string;
-}
-interface CartItem extends Product {
-  quantity: number;
-}
-interface OrderHistory {
-  id: number;
-  created_at: string;
-  total_amount: number;
-  summary: string;
+  icon: string;
 }
 
-let didInit = false;
-let cachedProducts: Product[] | null = null;
+const formatVND = (num: number | string) => {
+  const val = typeof num === "string" ? parseFloat(num) || 0 : num;
+  return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(val);
+};
 
 export default function ExploreScreen() {
-  const router = useRouter();
-  const [loading, setLoading] = useState(!didInit);
-  const [viewMode, setViewMode] = useState<"shop" | "cart" | "history">("shop");
-
-  const [products, setProducts] = useState<Product[]>(cachedProducts || []);
-  const [cart, setCart] = useState<CartItem[]>([]);
-  const [history, setHistory] = useState<OrderHistory[]>([]);
-
+  const [products, setProducts] = useState<ProductItem[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [selectedCatId, setSelectedCatId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [detailVisible, setDetailVisible] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const [orderDetailVisible, setOrderDetailVisible] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  // Modals state
+  const [showCart, setShowCart] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<ProductItem | null>(null);
+  const [buyQuantity, setBuyQuantity] = useState(1);
+  const [showDirectCheckout, setShowDirectCheckout] = useState(false);
+  const [directCheckoutItem, setDirectCheckoutItem] = useState<any | null>(null);
 
-  // ✅ Hàm tải dữ liệu (Dùng cho lần đầu và khi làm mới)
-  const loadData = async () => {
+  // Stores
+  const { initAuth } = useAuthStore();
+  const { loadCart, getItemCount } = useCartStore();
+  const cartItemCount = getItemCount();
+
+  // Khởi tạo Auth & Cart
+  useEffect(() => {
+    initAuth();
+    loadCart();
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
     try {
-      // Luôn fetch từ server để lấy dữ liệu mới nhất (nhờ Backend đã tắt cache)
-      const resP = await fetch(`${API_URL}/products`);
-      if (resP.ok) {
-        const data = await resP.json();
-        cachedProducts = data;
-        setProducts(data);
-      }
+      setLoading(true);
+      // Gọi song song danh mục & sản phẩm
+      const [catRes, prodRes] = await Promise.all([
+        fetch(`${API_URL}/categories`),
+        fetch(`${API_URL}/products`),
+      ]);
 
-      const savedCart = await AsyncStorage.getItem("userCart");
-      if (savedCart) setCart(JSON.parse(savedCart));
-    } catch (err) {
-      console.error(err);
+      if (catRes.ok) {
+        const catData = await catRes.json();
+        setCategories(catData.data || catData || []);
+      }
+      if (prodRes.ok) {
+        const prodData = await prodRes.json();
+        setProducts(prodData.data || prodData || []);
+      }
+    } catch (e) {
+      console.error("Lỗi tải dữ liệu sản phẩm:", e);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
-  if (!didInit) {
-    didInit = true;
-    loadData();
-  }
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchData();
+  };
 
-  const addToCart = (product: Product) => {
-    setCart((prev) => {
-      const existing = prev.find((item) => item.id === product.id);
-      const newCart = existing
-        ? prev.map((item) =>
-            item.id === product.id
-              ? { ...item, quantity: item.quantity + 1 }
-              : item,
-          )
-        : [...prev, { ...product, quantity: 1 }];
-      AsyncStorage.setItem("userCart", JSON.stringify(newCart));
-      return newCart;
+  // Lọc sản phẩm theo Category & Tìm kiếm
+  const filteredProducts = useMemo(() => {
+    return products.filter((p) => {
+      const matchCat =
+        selectedCatId === null ||
+        (p as any).category_id === selectedCatId ||
+        p.category === categories.find((c) => c.id === selectedCatId)?.name;
+
+      const matchSearch =
+        !searchQuery.trim() ||
+        p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (p.category && p.category.toLowerCase().includes(searchQuery.toLowerCase()));
+
+      return matchCat && matchSearch;
     });
-  };
-
-  const updateQuantity = (id: number, delta: number) => {
-    setCart((prev) => {
-      const newCart = prev.map((item) => {
-        if (item.id === id)
-          return { ...item, quantity: Math.max(1, item.quantity + delta) };
-        return item;
-      });
-      AsyncStorage.setItem("userCart", JSON.stringify(newCart));
-      return newCart;
-    });
-  };
-
-  const removeFromCart = (id: number) => {
-    setCart((prev) => {
-      const newCart = prev.filter((item) => item.id !== id);
-      AsyncStorage.setItem("userCart", JSON.stringify(newCart));
-      return newCart;
-    });
-  };
-
-  const clearCart = () => {
-    setCart([]);
-    AsyncStorage.removeItem("userCart");
-  };
-
-  // Trong app/(tabs)/explore.tsx
-
-  const handleCheckout = async () => {
-    if (cart.length === 0) return Alert.alert("Giỏ hàng trống");
-    if (isProcessingPayment) return;
-
-    setIsProcessingPayment(true);
-
-    try {
-      const tokenStr = await AsyncStorage.getItem("userToken");
-      let userId = null;
-
-      if (tokenStr) {
-        try {
-          const user = JSON.parse(tokenStr);
-          userId = user.id;
-        } catch (e) {}
-      }
-
-      // Nếu chưa đăng nhập thì cảnh báo nhưng vẫn cho mua (tùy chọn)
-      if (!userId) {
-        Alert.alert(
-          "Lưu ý",
-          "Bạn chưa đăng nhập. Đơn hàng sẽ không lưu vào lịch sử cá nhân.",
-        );
-      }
-
-      const payload = {
-        items: cart.map((item) => ({
-          product_id: item.id,
-          quantity: item.quantity,
-        })),
-        user_id: userId, // Gửi ID này lên Backend
-      };
-
-      const res = await fetch(`${API_URL}/orders/create`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await res.json();
-
-      if (res.ok) {
-        Alert.alert("Thành công 🎉", "Đơn hàng đã được ghi nhận!");
-        clearCart();
-
-        // Chuyển tab
-        setViewMode("history");
-
-        // QUAN TRỌNG: Gọi loadHistory ngay sau khi mua xong
-        // Không cần truyền userId vì hàm loadHistory mới sẽ tự lấy từ Storage
-        await loadHistory();
-      } else {
-        Alert.alert("Thất bại ❌", data.message || "Có lỗi xảy ra");
-      }
-    } catch (err) {
-      console.error(err);
-      Alert.alert("Lỗi mạng 📡");
-    } finally {
-      setIsProcessingPayment(false);
-    }
-  };
-
-  const loadHistory = async () => {
-    try {
-      // 1. Lấy token
-      const tokenStr = await AsyncStorage.getItem("userToken");
-
-      if (!tokenStr) {
-        console.log("Chưa có token, không tải lịch sử");
-        return;
-      }
-
-      // 2. Parse an toàn
-      let userId = null;
-      try {
-        const user = JSON.parse(tokenStr);
-        userId = user.id;
-      } catch (e) {
-        console.error("Lỗi parse token", e);
-        return;
-      }
-
-      if (!userId) {
-        console.log("Không tìm thấy userId trong token");
-        return;
-      }
-
-      console.log("🔄 Đang tải lịch sử cho user:", userId);
-
-      // 3. Gọi API
-      const res = await fetch(`${API_URL}/my-orders?userId=${userId}`);
-
-      if (res.ok) {
-        const data = await res.json();
-        console.log("✅ Dữ liệu lịch sử:", data); // Debug xem server trả về gì
-        setHistory(data);
-      } else {
-        console.error("❌ Lỗi API lịch sử:", await res.text());
-      }
-    } catch (err) {
-      console.error("💥 Lỗi mạng load history:", err);
-    }
-  };
-
-  const viewOrderDetail = async (orderId: number) => {
-    try {
-      const res = await fetch(`${API_URL}/orders/${orderId}`);
-      if (res.ok) {
-        setSelectedOrder(await res.json());
-        setOrderDetailVisible(true);
-      }
-    } catch (err) {
-      Alert.alert("Lỗi tải chi tiết");
-    }
-  };
-
-  // ✅ Xử lý chuyển tab: Tải lại dữ liệu khi vào tab Cửa hàng
-  const handleTabPress = (tab: "shop" | "cart" | "history") => {
-    setViewMode(tab);
-    if (tab === "history") {
-      loadHistory(); // Mỗi lần bấm tab Lịch sử đều tải lại
-    }
-    if (tab === "shop") {
-      loadData();
-    }
-  };
-
-  if (loading)
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color="#d97706" />
-      </View>
-    );
-
-  const filteredProducts = products.filter((p) =>
-    p.name.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
-  const totalPrice = cart.reduce(
-    (sum, item) => sum + item.price * item.quantity,
-    0,
-  );
+  }, [products, selectedCatId, searchQuery, categories]);
 
   return (
     <View style={styles.container}>
-      <View style={styles.headerNav}>
-        <TouchableOpacity
-          onPress={() => handleTabPress("shop")}
-          style={[styles.navBtn, viewMode === "shop" && styles.activeNav]}
-        >
-          <Ionicons
-            name="storefront-outline"
-            size={20}
-            color={viewMode === "shop" ? "#fff" : "#666"}
-          />
-          <Text>Cửa hàng</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => handleTabPress("cart")}
-          style={[styles.navBtn, viewMode === "cart" && styles.activeNav]}
-        >
-          <Ionicons
-            name="cart-outline"
-            size={20}
-            color={viewMode === "cart" ? "#fff" : "#666"}
-          />
-          <Text>Giỏ ({cart.length})</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => handleTabPress("history")}
-          style={[styles.navBtn, viewMode === "history" && styles.activeNav]}
-        >
-          <Ionicons
-            name="receipt-outline"
-            size={20}
-            color={viewMode === "history" ? "#fff" : "#666"}
-          />
-          <Text>Lịch sử</Text>
-        </TouchableOpacity>
-      </View>
+      {/* HEADER SECTION */}
+      <View style={styles.header}>
+        <View style={styles.headerTop}>
+          <View>
+            <Text style={styles.headerSubtitle}>Bộ Sưu Tập Thủ Công</Text>
+            <Text style={styles.headerTitle}>Eiko Handcraft 🎁</Text>
+          </View>
 
-      <View style={styles.content}>
-        {viewMode === "shop" && (
-          <>
-            <View style={styles.searchBox}>
-              <Ionicons name="search" size={20} color="#999" />
-              <TextInput
-                placeholder="Tìm sản phẩm..."
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                style={styles.searchInput}
-              />
-            </View>
-            <FlatList
-              data={filteredProducts}
-              keyExtractor={(i) => i.id.toString()}
-              numColumns={2}
-              columnWrapperStyle={{ justifyContent: "space-between" }}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.productCard}
-                  onPress={() => {
-                    setSelectedProduct(item);
-                    setDetailVisible(true);
-                  }}
-                >
-                  {item.image ? (
-                    <Image
-                      source={{ uri: item.image }}
-                      style={styles.img}
-                      resizeMode="cover"
-                    />
-                  ) : (
-                    <View style={[styles.img, styles.placeholder]}>
-                      <Ionicons name="cube" size={40} color="#ccc" />
-                    </View>
-                  )}
-                  <View style={styles.info}>
-                    <Text style={styles.name} numberOfLines={1}>
-                      {item.name}
-                    </Text>
-                    <Text style={styles.price}>
-                      ₺{Number(item.price).toLocaleString()}
-                    </Text>
-                    <TouchableOpacity
-                      style={styles.addBtn}
-                      onPress={(e) => {
-                        e.stopPropagation();
-                        addToCart(item);
-                      }}
-                    >
-                      <Ionicons name="add-cart" size={18} color="#fff" />
-                    </TouchableOpacity>
-                  </View>
-                </TouchableOpacity>
-              )}
-            />
-          </>
-        )}
-
-        {viewMode === "cart" && (
-          <ScrollView>
-            {cart.length === 0 ? (
-              <View style={styles.emptyState}>
-                <Ionicons name="cart-outline" size={64} color="#ddd" />
-                <Text style={styles.emptyText}>Giỏ hàng trống</Text>
-                <TouchableOpacity
-                  style={styles.goShopBtn}
-                  onPress={() => handleTabPress("shop")}
-                >
-                  <Text style={styles.goShopText}>Mua sắm ngay</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <>
-                {cart.map((item) => (
-                  <View key={item.id} style={styles.cartItem}>
-                    {item.image && (
-                      <Image
-                        source={{ uri: item.image }}
-                        style={styles.thumbSmall}
-                      />
-                    )}
-                    <View style={{ flex: 1, marginLeft: 10 }}>
-                      <Text style={styles.cartName}>{item.name}</Text>
-                      <Text style={styles.cartPrice}>
-                        ₺{Number(item.price).toLocaleString()}
-                      </Text>
-                      <View style={styles.qtyControl}>
-                        <TouchableOpacity
-                          onPress={() => updateQuantity(item.id, -1)}
-                          style={styles.qtyBtn}
-                        >
-                          <Text>-</Text>
-                        </TouchableOpacity>
-                        <Text style={styles.qtyText}>{item.quantity}</Text>
-                        <TouchableOpacity
-                          onPress={() => updateQuantity(item.id, 1)}
-                          style={styles.qtyBtn}
-                        >
-                          <Text>+</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                    <TouchableOpacity onPress={() => removeFromCart(item.id)}>
-                      <Ionicons name="trash-bin" size={20} color="#ef4444" />
-                    </TouchableOpacity>
-                  </View>
-                ))}
-                <View style={styles.checkoutSummary}>
-                  <Text>Tổng cộng:</Text>
-                  <Text style={styles.totalPrice}>
-                    ₺{totalPrice.toLocaleString()}
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  style={[
-                    styles.payBtn,
-                    isProcessingPayment && { opacity: 0.6 },
-                  ]}
-                  onPress={handleCheckout}
-                  disabled={isProcessingPayment}
-                >
-                  {isProcessingPayment ? (
-                    <ActivityIndicator color="#fff" />
-                  ) : (
-                    <Text style={styles.payText}>THANH TOÁN NGAY</Text>
-                  )}
-                </TouchableOpacity>
-              </>
-            )}
-          </ScrollView>
-        )}
-
-        {viewMode === "history" && (
-          <FlatList
-            data={history}
-            keyExtractor={(i) => i.id.toString()}
-            ListEmptyComponent={
-              <View style={styles.emptyState}>
-                <Ionicons name="receipt-outline" size={64} color="#ddd" />
-                <Text style={styles.emptyText}>Chưa có đơn hàng.</Text>
-              </View>
-            }
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.historyCard}
-                onPress={() => viewOrderDetail(item.id)}
-              >
-                <View
-                  style={{
-                    flexDirection: "row",
-                    justifyContent: "space-between",
-                  }}
-                >
-                  <Text style={styles.histTitle}>Đơn #{item.id}</Text>
-                  <Text style={styles.histAmount}>
-                    ₺{Number(item.total_amount).toLocaleString()}
-                  </Text>
-                </View>
-                <Text style={styles.histSummary} numberOfLines={2}>
-                  {item.summary}
-                </Text>
-                <Text
-                  style={{
-                    color: "#d97706",
-                    fontSize: 12,
-                    textAlign: "right",
-                    marginTop: 5,
-                  }}
-                >
-                  Xem chi tiết &rarr;
-                </Text>
-              </TouchableOpacity>
-            )}
-          />
-        )}
-      </View>
-
-      {/* MODAL CHI TIẾT SẢN PHẨM */}
-      <Modal
-        visible={detailVisible}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setDetailVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.detailSheet}>
-            <ScrollView>
-              {selectedProduct?.image && (
-                <Image
-                  source={{ uri: selectedProduct.image }}
-                  style={styles.detailImg}
-                />
-              )}
-              <View style={styles.detailInfo}>
-                <Text style={styles.detailName}>{selectedProduct?.name}</Text>
-                <Text style={styles.detailPrice}>
-                  ₺{Number(selectedProduct?.price).toLocaleString()}
-                </Text>
-                <Text style={styles.detailDesc}>
-                  {selectedProduct?.description}
-                </Text>
-                <TouchableOpacity
-                  style={styles.addToCartBig}
-                  onPress={() => {
-                    if (selectedProduct) addToCart(selectedProduct);
-                    setDetailVisible(false);
-                  }}
-                >
-                  <Ionicons name="cart-add" size={24} color="#fff" />
-                  <Text
-                    style={{ color: "#fff", fontWeight: "bold", marginLeft: 8 }}
-                  >
-                    Thêm vào giỏ
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </ScrollView>
+          <View style={styles.headerActions}>
+            {/* NÚT LỊCH SỬ ĐƠN HÀNG & HÓA ĐƠN */}
             <TouchableOpacity
-              style={styles.closeDetailBtn}
-              onPress={() => setDetailVisible(false)}
+              style={styles.billHeaderBtn}
+              onPress={() => setShowHistory(true)}
+              activeOpacity={0.7}
             >
-              <Text>Đóng</Text>
+              <Ionicons name="receipt-outline" size={17} color="#d97706" />
+              <Text style={styles.billHeaderBtnText}>Hóa đơn</Text>
+            </TouchableOpacity>
+
+            {/* NÚT GIỎ HÀNG */}
+            <TouchableOpacity
+              style={[styles.iconBtn, styles.cartIconBtn]}
+              onPress={() => setShowCart(true)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="cart-outline" size={22} color="#fff" />
+              {cartItemCount > 0 && (
+                <View style={styles.cartBadge}>
+                  <Text style={styles.cartBadgeText}>{cartItemCount}</Text>
+                </View>
+              )}
             </TouchableOpacity>
           </View>
         </View>
-      </Modal>
 
-      {/* MODAL CHI TIẾT ĐƠN HÀNG */}
-      <Modal
-        visible={orderDetailVisible}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setOrderDetailVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.detailSheet}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                Hóa đơn #{selectedOrder?.id}
-              </Text>
-              <TouchableOpacity onPress={() => setOrderDetailVisible(false)}>
-                <Ionicons name="close" size={24} color="#666" />
-              </TouchableOpacity>
-            </View>
-            <ScrollView style={{ padding: 20 }}>
-              <Text style={styles.sectionTitle}>Sản phẩm:</Text>
-              {selectedOrder?.items.map((item: any, i: number) => (
-                <View key={i} style={styles.orderItemRow}>
-                  <Text style={{ flex: 1 }}>
-                    {item.name} x{item.quantity}
-                  </Text>
-                  <Text style={styles.itemTotal}>
-                    ₺{Number(item.price * item.quantity).toLocaleString()}
-                  </Text>
-                </View>
-              ))}
-              <View style={styles.totalRow}>
-                <Text style={styles.totalLabel}>Tổng cộng:</Text>
-                <Text style={styles.totalValue}>
-                  ₺
-                  {selectedOrder
-                    ? Number(selectedOrder.total_amount).toLocaleString()
-                    : 0}
-                </Text>
-              </View>
-            </ScrollView>
-          </View>
+        {/* SEARCH BAR */}
+        <View style={styles.searchBar}>
+          <Ionicons name="search-outline" size={18} color="#9ca3af" />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Tìm kiếm túi cói, gốm sứ, lụa Huế..."
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholderTextColor="#9ca3af"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery("")}>
+              <Ionicons name="close-circle" size={18} color="#9ca3af" />
+            </TouchableOpacity>
+          )}
         </View>
-      </Modal>
+
+        {/* CATEGORY CHIPS */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoryList}
+        >
+          <TouchableOpacity
+            style={[styles.catChip, selectedCatId === null && styles.catChipActive]}
+            onPress={() => setSelectedCatId(null)}
+          >
+            <Text style={[styles.catChipText, selectedCatId === null && styles.catChipTextActive]}>
+              ✨ Tất cả ({products.length})
+            </Text>
+          </TouchableOpacity>
+
+          {categories.map((cat) => (
+            <TouchableOpacity
+              key={cat.id}
+              style={[styles.catChip, selectedCatId === cat.id && styles.catChipActive]}
+              onPress={() => setSelectedCatId(cat.id === selectedCatId ? null : cat.id)}
+            >
+              <Text
+                style={[
+                  styles.catChipText,
+                  selectedCatId === cat.id && styles.catChipTextActive,
+                ]}
+              >
+                {cat.icon} {cat.name}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+
+      {/* PRODUCT GRID */}
+      {loading ? (
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color="#d97706" />
+          <Text style={styles.loadingText}>Đang cập nhật sản phẩm thủ công...</Text>
+        </View>
+      ) : filteredProducts.length === 0 ? (
+        <View style={styles.centerContainer}>
+          <Ionicons name="cube-outline" size={60} color="#d1d5db" />
+          <Text style={styles.emptyTitle}>Không tìm thấy sản phẩm nào</Text>
+          <Text style={styles.emptySub}>Thử tìm kiếm với từ khóa khác hoặc xóa bộ lọc danh mục.</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={filteredProducts}
+          keyExtractor={(item) => item.id.toString()}
+          numColumns={2}
+          contentContainerStyle={styles.gridContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={["#d97706"]} />
+          }
+          renderItem={({ item }) => (
+            <ProductCard
+              product={item}
+              onPress={() => {
+                setSelectedProduct(item);
+                setBuyQuantity(1);
+              }}
+            />
+          )}
+        />
+      )}
+
+      {/* CART DRAWER */}
+      <CartDrawer
+        visible={showCart}
+        onClose={() => setShowCart(false)}
+        onOrderSuccess={(orderCode) => {
+          setShowCart(false);
+          setShowHistory(true);
+        }}
+      />
+
+      {/* ORDER HISTORY MODAL */}
+      <OrderHistoryModal visible={showHistory} onClose={() => setShowHistory(false)} />
+
+      {/* DIRECT BUY CHECKOUT MODAL */}
+      <CheckoutModal
+        visible={showDirectCheckout}
+        directItem={directCheckoutItem}
+        onClose={() => {
+          setShowDirectCheckout(false);
+          setDirectCheckoutItem(null);
+        }}
+        onSuccess={(orderCode) => {
+          setShowDirectCheckout(false);
+          setDirectCheckoutItem(null);
+          setShowHistory(true);
+        }}
+      />
+
+      {/* PRODUCT DETAIL MODAL */}
+      {selectedProduct && (
+        <Modal visible={!!selectedProduct} animationType="slide" transparent>
+          <View style={styles.detailOverlay}>
+            <View style={styles.detailSheet}>
+              <TouchableOpacity
+                style={styles.detailCloseBtn}
+                onPress={() => setSelectedProduct(null)}
+              >
+                <Ionicons name="close" size={24} color="#1f2937" />
+              </TouchableOpacity>
+
+              <ScrollView showsVerticalScrollIndicator={false}>
+                <Image
+                  source={{
+                    uri: selectedProduct.image?.startsWith("http")
+                      ? selectedProduct.image
+                      : `${BASE_URL}${selectedProduct.image}`,
+                  }}
+                  style={styles.detailImg}
+                  resizeMode="cover"
+                />
+
+                <View style={styles.detailBody}>
+                  <Text style={styles.detailCategory}>
+                    {selectedProduct.category_name || selectedProduct.category || "Đồ thủ công"}
+                  </Text>
+                  <Text style={styles.detailTitle}>{selectedProduct.name}</Text>
+                  <Text style={styles.detailPrice}>{formatVND(selectedProduct.price)}</Text>
+
+                  <View style={styles.divider} />
+
+                  <Text style={styles.sectionTitle}>Mô Tả Sản Phẩm</Text>
+                  <Text style={styles.detailDesc}>
+                    {(selectedProduct as any).description ||
+                      "Sản phẩm được chế tác tỉ mỉ bởi các nghệ nhân làng nghề truyền thống Việt Nam. Chất liệu tự nhiên, thân thiện với môi trường."}
+                  </Text>
+
+                  <View style={styles.specBox}>
+                    <Text style={styles.specItem}>
+                      📦 Tồn kho hiện có: <Text style={{ fontWeight: "700" }}>{selectedProduct.stock} món</Text>
+                    </Text>
+                    <Text style={styles.specItem}>
+                      ⭐ Đánh giá: <Text style={{ fontWeight: "700" }}>{selectedProduct.rating || "5.0"} (126 nhận xét)</Text>
+                    </Text>
+                  </View>
+
+                  {/* BỘ CHỌN SỐ LƯỢNG MUA */}
+                  {selectedProduct.stock > 0 && (
+                    <View style={styles.qtyRow}>
+                      <Text style={styles.qtyLabel}>Số lượng đặt mua:</Text>
+                      <View style={styles.qtyControls}>
+                        <TouchableOpacity
+                          style={styles.qtyBtn}
+                          onPress={() => setBuyQuantity((q) => Math.max(1, q - 1))}
+                        >
+                          <Ionicons name="remove" size={18} color="#374151" />
+                        </TouchableOpacity>
+                        <Text style={styles.qtyText}>{buyQuantity}</Text>
+                        <TouchableOpacity
+                          style={styles.qtyBtn}
+                          disabled={buyQuantity >= selectedProduct.stock}
+                          onPress={() => setBuyQuantity((q) => Math.min(selectedProduct.stock, q + 1))}
+                        >
+                          <Ionicons name="add" size={18} color="#374151" />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  )}
+                </View>
+              </ScrollView>
+
+              <View style={styles.detailFooter}>
+                <View style={styles.btnRowActions}>
+                  <TouchableOpacity
+                    style={[styles.detailAddBtn, selectedProduct.stock <= 0 && { backgroundColor: "#9ca3af" }]}
+                    disabled={selectedProduct.stock <= 0}
+                    onPress={() => {
+                      for (let i = 0; i < buyQuantity; i++) {
+                        useCartStore.getState().addToCart({
+                          id: selectedProduct.id,
+                          name: selectedProduct.name,
+                          price:
+                            typeof selectedProduct.price === "string"
+                              ? parseFloat(selectedProduct.price) || 0
+                              : selectedProduct.price,
+                          stock: selectedProduct.stock,
+                          image: selectedProduct.image?.startsWith("http")
+                            ? selectedProduct.image
+                            : `${BASE_URL}${selectedProduct.image}`,
+                        });
+                      }
+                      setSelectedProduct(null);
+                      setShowCart(true);
+                    }}
+                  >
+                    <Ionicons name="cart" size={18} color="#fff" />
+                    <Text style={styles.detailAddBtnText}>
+                      {selectedProduct.stock <= 0 ? "Hết Hàng" : "Thêm Giỏ"}
+                    </Text>
+                  </TouchableOpacity>
+
+                  {selectedProduct.stock > 0 && (
+                    <TouchableOpacity
+                      style={styles.detailBuyNowBtn}
+                      onPress={() => {
+                        const itemToBuy = {
+                          id: selectedProduct.id,
+                          name: selectedProduct.name,
+                          price:
+                            typeof selectedProduct.price === "string"
+                              ? parseFloat(selectedProduct.price) || 0
+                              : selectedProduct.price,
+                          quantity: buyQuantity,
+                          image: selectedProduct.image?.startsWith("http")
+                            ? selectedProduct.image
+                            : `${BASE_URL}${selectedProduct.image}`,
+                        };
+                        setSelectedProduct(null);
+                        setDirectCheckoutItem(itemToBuy);
+                        setShowDirectCheckout(true);
+                      }}
+                    >
+                      <Ionicons name="flash" size={18} color="#fff" />
+                      <Text style={styles.detailBuyNowBtnText}>Mua Ngay</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f3f4f6" },
-  center: { flex: 1, justifyContent: "center", alignItems: "center" },
-  headerNav: {
-    flexDirection: "row",
-    backgroundColor: "#fff",
-    padding: 10,
-    gap: 10,
-    elevation: 2,
-  },
-  navBtn: {
+  container: {
     flex: 1,
-    alignItems: "center",
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: "#f3f4f6",
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: 4,
+    backgroundColor: "#f9fafb",
   },
-  activeNav: { backgroundColor: "#d97706" },
-  content: { flex: 1, padding: 16 },
-  searchBox: {
-    flexDirection: "row",
-    alignItems: "center",
+  header: {
     backgroundColor: "#fff",
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    height: 40,
-    marginBottom: 15,
-    borderWidth: 1,
-    borderColor: "#eee",
+    paddingTop: 50,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f3f4f6",
   },
-  searchInput: { flex: 1, marginLeft: 8 },
-  productCard: {
-    width: "48%",
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    overflow: "hidden",
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: "#eee",
-    position: "relative",
-  },
-  img: { width: "100%", height: 150, backgroundColor: "#f9fafb" },
-  placeholder: { justifyContent: "center", alignItems: "center" },
-  info: { padding: 10 },
-  name: { fontSize: 14, fontWeight: "600", color: "#1f2937", marginBottom: 4 },
-  price: { fontSize: 15, color: "#d97706", fontWeight: "bold" },
-  addBtn: {
-    position: "absolute",
-    bottom: 10,
-    right: 10,
-    backgroundColor: "#d97706",
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  emptyState: { alignItems: "center", marginTop: 50 },
-  emptyText: { color: "#999", marginTop: 10 },
-  goShopBtn: {
-    marginTop: 20,
-    backgroundColor: "#d97706",
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
-  goShopText: { color: "#fff", fontWeight: "bold" },
-  cartItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#fff",
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: "#eee",
-  },
-  thumbSmall: { width: 50, height: 50, borderRadius: 8 },
-  cartName: { fontWeight: "bold", fontSize: 14 },
-  cartPrice: { color: "#d97706", fontSize: 13, marginTop: 2 },
-  qtyControl: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 5,
-    gap: 10,
-  },
-  qtyBtn: {
-    backgroundColor: "#f3f4f6",
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  qtyText: { fontWeight: "bold", minWidth: 20, textAlign: "center" },
-  checkoutSummary: {
+  headerTop: {
     flexDirection: "row",
     justifyContent: "space-between",
-    padding: 15,
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    marginTop: 10,
-    borderWidth: 1,
-    borderColor: "#eee",
-  },
-  totalPrice: { fontSize: 18, fontWeight: "bold", color: "#dc2626" },
-  payBtn: {
-    backgroundColor: "#1f2937",
-    padding: 15,
-    borderRadius: 12,
     alignItems: "center",
-    marginTop: 15,
+    marginBottom: 12,
   },
-  payText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
-  historyCard: {
-    backgroundColor: "#fff",
-    padding: 15,
+  headerSubtitle: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#d97706",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: "900",
+    color: "#1f2937",
+    letterSpacing: -0.5,
+  },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  iconBtn: {
+    width: 42,
+    height: 42,
     borderRadius: 12,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: "#eee",
+    backgroundColor: "#f3f4f6",
+    justifyContent: "center",
+    alignItems: "center",
   },
-  histTitle: { fontWeight: "bold", color: "#1f2937" },
-  histAmount: { fontWeight: "bold", color: "#d97706" },
-  histSummary: { fontSize: 12, color: "#666", marginTop: 5 },
-  modalOverlay: {
+  cartIconBtn: {
+    backgroundColor: "#d97706",
+    position: "relative",
+  },
+  cartBadge: {
+    position: "absolute",
+    top: -4,
+    right: -4,
+    backgroundColor: "#ef4444",
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 4,
+    borderWidth: 2,
+    borderColor: "#fff",
+  },
+  cartBadgeText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "800",
+  },
+  searchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f3f4f6",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 8,
+    marginBottom: 12,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: "#1f2937",
+  },
+  categoryList: {
+    gap: 8,
+    paddingRight: 10,
+  },
+  catChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: "#f3f4f6",
+  },
+  catChipActive: {
+    backgroundColor: "#d97706",
+  },
+  catChipText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#4b5563",
+  },
+  catChipTextActive: {
+    color: "#fff",
+  },
+  gridContent: {
+    padding: 10,
+    paddingBottom: 40,
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 30,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: "#6b7280",
+    fontWeight: "500",
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#374151",
+    marginTop: 16,
+  },
+  emptySub: {
+    fontSize: 13,
+    color: "#9ca3af",
+    textAlign: "center",
+    marginTop: 6,
+  },
+  detailOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "flex-end",
@@ -717,74 +538,168 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: "85%",
-    minHeight: "50%",
+    overflow: "hidden",
   },
-  detailImg: { width: "100%", height: 250, backgroundColor: "#f9fafb" },
-  detailInfo: { padding: 20 },
-  detailName: {
+  detailCloseBtn: {
+    position: "absolute",
+    top: 16,
+    right: 16,
+    zIndex: 10,
+    backgroundColor: "rgba(255,255,255,0.9)",
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  detailImg: {
+    width: "100%",
+    height: 280,
+    backgroundColor: "#f3f4f6",
+  },
+  detailBody: {
+    padding: 20,
+  },
+  detailCategory: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#d97706",
+    textTransform: "uppercase",
+    marginBottom: 4,
+  },
+  detailTitle: {
     fontSize: 20,
-    fontWeight: "bold",
-    color: "#111827",
+    fontWeight: "800",
+    color: "#1f2937",
     marginBottom: 8,
   },
   detailPrice: {
     fontSize: 22,
+    fontWeight: "900",
     color: "#d97706",
-    fontWeight: "bold",
     marginBottom: 12,
   },
-  detailDesc: {
+  divider: {
+    height: 1,
+    backgroundColor: "#f3f4f6",
+    marginVertical: 14,
+  },
+  sectionTitle: {
     fontSize: 15,
+    fontWeight: "700",
+    color: "#374151",
+    marginBottom: 8,
+  },
+  detailDesc: {
+    fontSize: 14,
     color: "#4b5563",
     lineHeight: 22,
-    marginBottom: 15,
+    marginBottom: 16,
   },
-  addToCartBig: {
-    backgroundColor: "#d97706",
-    padding: 15,
+  specBox: {
+    backgroundColor: "#f9fafb",
+    padding: 14,
     borderRadius: 12,
+    gap: 8,
+  },
+  specItem: {
+    fontSize: 13,
+    color: "#4b5563",
+  },
+  detailFooter: {
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: "#f3f4f6",
+    backgroundColor: "#fff",
+  },
+  qtyRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 14,
+    backgroundColor: "#fffbeb",
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#fde68a",
+  },
+  qtyLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#92400e",
+  },
+  qtyControls: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+  },
+  qtyBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  qtyText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#1f2937",
+    minWidth: 26,
+    textAlign: "center",
+  },
+  btnRowActions: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  detailAddBtn: {
+    flex: 1,
+    backgroundColor: "#f59e0b",
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
+    paddingVertical: 14,
+    borderRadius: 14,
+    gap: 6,
   },
-  closeDetailBtn: {
-    padding: 15,
-    textAlign: "center",
-    color: "#666",
-    borderTopWidth: 1,
-    borderColor: "#eee",
+  detailAddBtnText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "800",
   },
-  modalHeader: {
+  detailBuyNowBtn: {
+    flex: 1,
+    backgroundColor: "#d97706",
     flexDirection: "row",
-    justifyContent: "space-between",
+    justifyContent: "center",
     alignItems: "center",
-    padding: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: "#eee",
+    paddingVertical: 14,
+    borderRadius: 14,
+    gap: 6,
+    shadowColor: "#d97706",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4,
   },
-  modalTitle: { fontSize: 18, fontWeight: "bold" },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "bold",
-    marginTop: 20,
-    marginBottom: 10,
+  detailBuyNowBtnText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "800",
   },
-  orderItemRow: {
+  billHeaderBtn: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f3f4f6",
+    alignItems: "center",
+    backgroundColor: "#fffbeb",
+    borderWidth: 1,
+    borderColor: "#fde68a",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    gap: 4,
   },
-  itemTotal: { fontWeight: "bold", color: "#d97706" },
-  totalRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 20,
-    paddingTop: 15,
-    borderTopWidth: 1,
-    borderTopColor: "#ddd",
+  billHeaderBtnText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#d97706",
   },
-  totalLabel: { fontSize: 16, fontWeight: "bold" },
-  totalValue: { fontSize: 18, fontWeight: "bold", color: "#dc2626" },
 });

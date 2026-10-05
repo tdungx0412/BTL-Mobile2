@@ -1,4 +1,5 @@
 // hooks/useShopProducts.ts
+import { API_URL } from "@/constants/config";
 import { useEffect, useState } from "react";
 
 export interface Product {
@@ -33,8 +34,7 @@ interface UseShopProductsReturn {
   error: string | null;
 }
 
-const API_BASE_URL =
-  process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3001/api";
+const API_BASE_URL = API_URL;
 
 export function useShopProducts(): UseShopProductsReturn {
   const [products, setProducts] = useState<Product[]>([]);
