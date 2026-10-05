@@ -525,6 +525,16 @@ const handleGetAdminOrders = async (req, res) => {
 app.get("/api/admin/orders", handleGetAdminOrders);
 app.get("/admin/orders", handleGetAdminOrders);
 
+app.get(["/api/admin/orders/:id", "/admin/orders/:id"], async (req, res) => {
+  const { id } = req.params;
+  try {
+    const order = await OrderService.getOrderDetail(id);
+    res.json(order);
+  } catch (error) {
+    res.status(error.status || 500).json({ message: error.message || "Lỗi tải chi tiết đơn hàng" });
+  }
+});
+
 const handleUpdateOrderStatus = async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
@@ -590,6 +600,202 @@ app.get("/api/admin/revenue/daily", async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+
+// ==========================================
+//      THỐNG KÊ DOANH THU & HOẠT ĐỘNG
+// ==========================================
+const handleGetAdminStatistics = async (req, res) => {
+  const range = req.query.range || "all"; // all, today, week, month
+
+  let dateFilter = "1=1";
+  let bookingDateFilter = "1=1";
+  if (range === "today") {
+    dateFilter = "DATE(o.created_at) = CURDATE()";
+    bookingDateFilter = "DATE(sb.created_at) = CURDATE()";
+  } else if (range === "week") {
+    dateFilter = "o.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)";
+    bookingDateFilter = "sb.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)";
+  } else if (range === "month") {
+    dateFilter = "o.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)";
+    bookingDateFilter = "sb.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)";
+  }
+
+  try {
+    // 1. Order summary
+    const [summaryRows] = await pool.query(`
+      SELECT 
+        COUNT(*) as total_orders,
+        COALESCE(SUM(o.total_amount), 0) as total_revenue,
+        COALESCE(SUM(CASE WHEN o.status IN ('confirmed', 'completed', 'shipping') OR o.payment_status = 'paid' THEN o.total_amount ELSE 0 END), 0) as valid_revenue,
+        COALESCE(SUM(CASE WHEN o.status = 'pending' THEN 1 ELSE 0 END), 0) as pending_orders,
+        COALESCE(SUM(CASE WHEN o.status = 'confirmed' THEN 1 ELSE 0 END), 0) as confirmed_orders,
+        COALESCE(SUM(CASE WHEN o.status = 'shipping' THEN 1 ELSE 0 END), 0) as shipping_orders,
+        COALESCE(SUM(CASE WHEN o.status = 'completed' THEN 1 ELSE 0 END), 0) as completed_orders,
+        COALESCE(SUM(CASE WHEN o.status = 'cancelled' THEN 1 ELSE 0 END), 0) as cancelled_orders
+      FROM orders o
+      WHERE ${dateFilter}
+    `);
+
+    // 2. Customer count
+    const [customerRows] = await pool.query(`
+      SELECT COUNT(DISTINCT phone) as unique_customers FROM orders WHERE phone != ''
+    `);
+    const [userRows] = await pool.query(`
+      SELECT COUNT(*) as total_registered_customers FROM users WHERE role = 'customer'
+    `);
+
+    // 3. Products summary
+    const [prodRows] = await pool.query(`
+      SELECT 
+        COUNT(*) as total_products,
+        COALESCE(SUM(stock), 0) as total_stock,
+        COALESCE(SUM(CASE WHEN stock <= 0 THEN 1 ELSE 0 END), 0) as out_of_stock,
+        COALESCE(SUM(CASE WHEN stock > 0 AND stock <= 5 THEN 1 ELSE 0 END), 0) as low_stock
+      FROM products
+      WHERE is_active = TRUE
+    `);
+
+    // 4. Top Selling Products
+    const [topProducts] = await pool.query(`
+      SELECT 
+        oi.product_id, 
+        COALESCE(oi.item_name, p.name, 'Sản phẩm') as name, 
+        p.image, 
+        p.category, 
+        p.price as current_price,
+        SUM(oi.quantity) as total_quantity, 
+        SUM(oi.price_at_purchase * oi.quantity) as total_revenue 
+      FROM order_items oi 
+      LEFT JOIN products p ON oi.product_id = p.id 
+      JOIN orders o ON oi.order_id = o.id 
+      WHERE ${dateFilter} AND o.status != 'cancelled' 
+      GROUP BY oi.product_id, oi.item_name, p.name, p.image, p.category, p.price 
+      ORDER BY total_quantity DESC LIMIT 6
+    `);
+
+    // 5. Category Breakdown
+    const [categoryRows] = await pool.query(`
+      SELECT 
+        COALESCE(p.category, 'Đồ thủ công') as category, 
+        SUM(oi.quantity) as total_quantity, 
+        SUM(oi.price_at_purchase * oi.quantity) as total_revenue 
+      FROM order_items oi 
+      LEFT JOIN products p ON oi.product_id = p.id 
+      JOIN orders o ON oi.order_id = o.id 
+      WHERE ${dateFilter} AND o.status != 'cancelled' 
+      GROUP BY COALESCE(p.category, 'Đồ thủ công') 
+      ORDER BY total_revenue DESC
+    `);
+
+    // 6. Payment Methods Breakdown
+    const [paymentRows] = await pool.query(`
+      SELECT 
+        o.payment_method, 
+        COUNT(*) as count, 
+        COALESCE(SUM(o.total_amount), 0) as total_amount 
+      FROM orders o 
+      WHERE ${dateFilter} AND o.status != 'cancelled' 
+      GROUP BY o.payment_method
+    `);
+
+    // 7. Service Bookings summary
+    const [bookingRows] = await pool.query(`
+      SELECT 
+        COUNT(*) as total_bookings,
+        COALESCE(SUM(sb.estimated_price), 0) as total_booking_rev,
+        COALESCE(SUM(CASE WHEN sb.status = 'pending' THEN 1 ELSE 0 END), 0) as pending_bookings,
+        COALESCE(SUM(CASE WHEN sb.status = 'confirmed' THEN 1 ELSE 0 END), 0) as confirmed_bookings,
+        COALESCE(SUM(CASE WHEN sb.status = 'in_progress' THEN 1 ELSE 0 END), 0) as in_progress_bookings,
+        COALESCE(SUM(CASE WHEN sb.status = 'completed' THEN 1 ELSE 0 END), 0) as completed_bookings,
+        COALESCE(SUM(CASE WHEN sb.status = 'cancelled' THEN 1 ELSE 0 END), 0) as cancelled_bookings
+      FROM service_bookings sb
+      WHERE ${bookingDateFilter}
+    `);
+
+    // 8. Daily Trend for the past 7 days
+    const [dailyRows] = await pool.query(`
+      SELECT 
+        DATE_FORMAT(o.created_at, '%d/%m') as date_label,
+        DATE(o.created_at) as raw_date,
+        COUNT(*) as orders_count,
+        COALESCE(SUM(CASE WHEN o.status != 'cancelled' THEN o.total_amount ELSE 0 END), 0) as day_revenue
+      FROM orders o
+      WHERE o.created_at >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+      GROUP BY DATE(o.created_at), DATE_FORMAT(o.created_at, '%d/%m')
+      ORDER BY raw_date ASC
+    `);
+
+    const last7Days = [];
+    const dayNames = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dayStr = `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+      const dayName = dayNames[d.getDay()];
+      const match = dailyRows.find((r) => r.date_label === dayStr);
+      last7Days.push({
+        date: dayStr,
+        dayName,
+        orders: match ? Number(match.orders_count) : 0,
+        revenue: match ? parseFloat(match.day_revenue) : 0,
+      });
+    }
+
+    res.json({
+      range,
+      summary: {
+        totalRevenue: parseFloat(summaryRows[0]?.total_revenue || 0),
+        validRevenue: parseFloat(summaryRows[0]?.valid_revenue || 0),
+        totalOrders: Number(summaryRows[0]?.total_orders || 0),
+        pendingOrders: Number(summaryRows[0]?.pending_orders || 0),
+        confirmedOrders: Number(summaryRows[0]?.confirmed_orders || 0),
+        shippingOrders: Number(summaryRows[0]?.shipping_orders || 0),
+        completedOrders: Number(summaryRows[0]?.completed_orders || 0),
+        cancelledOrders: Number(summaryRows[0]?.cancelled_orders || 0),
+        uniqueCustomers: Number(customerRows[0]?.unique_customers || 0),
+        registeredCustomers: Number(userRows[0]?.total_registered_customers || 0),
+        totalProducts: Number(prodRows[0]?.total_products || 0),
+        totalStock: Number(prodRows[0]?.total_stock || 0),
+        outOfStock: Number(prodRows[0]?.out_of_stock || 0),
+        lowStock: Number(prodRows[0]?.low_stock || 0),
+      },
+      topProducts: topProducts.map((p) => ({
+        id: p.product_id,
+        name: p.name,
+        image: p.image,
+        category: p.category,
+        price: parseFloat(p.current_price || 0),
+        quantity: Number(p.total_quantity || 0),
+        revenue: parseFloat(p.total_revenue || 0),
+      })),
+      categoryBreakdown: categoryRows.map((c) => ({
+        category: c.category,
+        quantity: Number(c.total_quantity || 0),
+        revenue: parseFloat(c.total_revenue || 0),
+      })),
+      paymentMethods: paymentRows.map((pm) => ({
+        method: pm.payment_method || "COD",
+        count: Number(pm.count || 0),
+        total: parseFloat(pm.total_amount || 0),
+      })),
+      bookings: {
+        total: Number(bookingRows[0]?.total_bookings || 0),
+        revenue: parseFloat(bookingRows[0]?.total_booking_rev || 0),
+        pending: Number(bookingRows[0]?.pending_bookings || 0),
+        confirmed: Number(bookingRows[0]?.confirmed_bookings || 0),
+        inProgress: Number(bookingRows[0]?.in_progress_bookings || 0),
+        completed: Number(bookingRows[0]?.completed_bookings || 0),
+        cancelled: Number(bookingRows[0]?.cancelled_bookings || 0),
+      },
+      chart7Days: last7Days,
+    });
+  } catch (error) {
+    console.error("Lỗi lấy thống kê admin:", error);
+    res.status(500).json({ message: "Lỗi lấy dữ liệu thống kê: " + error.message });
+  }
+};
+
+app.get(["/api/admin/statistics", "/admin/statistics", "/api/statistics"], handleGetAdminStatistics);
 
 app.get("/api/admin/customers", async (req, res) => {
   try {

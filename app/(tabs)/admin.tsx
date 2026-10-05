@@ -1,5 +1,6 @@
 import { API_URL, BASE_URL } from "@/constants/config";
 import { AddServiceModal } from "@/components/service/AddServiceModal";
+import { AdminOrderDetailModal } from "@/components/order/AdminOrderDetailModal";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import React, { useEffect, useState } from "react";
@@ -143,6 +144,13 @@ export default function AdminScreen() {
   const [refreshingOrders, setRefreshingOrders] = useState(false);
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [processingOrderId, setProcessingOrderId] = useState<number | null>(null);
+  const [selectedOrderForDetail, setSelectedOrderForDetail] = useState<any | null>(null);
+  const [visibleOrderDetailModal, setVisibleOrderDetailModal] = useState(false);
+
+  const handleOpenOrderDetail = (order: any) => {
+    setSelectedOrderForDetail(order);
+    setVisibleOrderDetailModal(true);
+  };
 
   // Fetch danh sách đơn hàng
   const fetchAdminOrders = async (isPull = false) => {
@@ -674,11 +682,21 @@ export default function AdminScreen() {
                 const isProcessing = processingOrderId === item.id;
 
                 return (
-                  <View style={s.orderCard}>
+                  <TouchableOpacity
+                    style={s.orderCard}
+                    activeOpacity={0.88}
+                    onPress={() => handleOpenOrderDetail(item)}
+                  >
                     {/* CARD HEADER */}
                     <View style={s.cardHeader}>
                       <View>
-                        <Text style={s.orderCode}>{item.order_code || `Đơn #${item.id}`}</Text>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                          <Text style={s.orderCode}>{item.order_code || `Đơn #${item.id}`}</Text>
+                          <View style={s.viewDetailTag}>
+                            <Text style={s.viewDetailTagText}>Xem chi tiết</Text>
+                            <Ionicons name="chevron-forward" size={11} color="#b45309" />
+                          </View>
+                        </View>
                         <Text style={s.orderDate}>
                           {item.created_at ? new Date(item.created_at).toLocaleString("vi-VN") : ""}
                         </Text>
@@ -712,12 +730,25 @@ export default function AdminScreen() {
 
                       {/* ACTION BUTTONS */}
                       <View style={s.actionRow}>
+                        {/* NÚT CHI TIẾT */}
+                        <TouchableOpacity
+                          style={s.btnDetailHint}
+                          onPress={() => handleOpenOrderDetail(item)}
+                          activeOpacity={0.8}
+                        >
+                          <Ionicons name="eye-outline" size={13} color="#b45309" />
+                          <Text style={s.btnDetailHintText}>Chi tiết</Text>
+                        </TouchableOpacity>
+
                         {item.status === "pending" && (
                           <>
                             <TouchableOpacity
                               style={s.btnCancel}
                               disabled={isProcessing}
-                              onPress={() => handleUpdateOrderStatus(item.id, "cancelled", "Đã hủy")}
+                              onPress={(e) => {
+                                e.stopPropagation();
+                                handleUpdateOrderStatus(item.id, "cancelled", "Đã hủy");
+                              }}
                             >
                               <Text style={s.btnCancelText}>Hủy</Text>
                             </TouchableOpacity>
@@ -725,7 +756,10 @@ export default function AdminScreen() {
                             <TouchableOpacity
                               style={s.btnConfirm}
                               disabled={isProcessing}
-                              onPress={() => handleUpdateOrderStatus(item.id, "confirmed", "Đã xác nhận")}
+                              onPress={(e) => {
+                                e.stopPropagation();
+                                handleUpdateOrderStatus(item.id, "confirmed", "Đã xác nhận");
+                              }}
                             >
                               {isProcessing ? (
                                 <ActivityIndicator size="small" color="#fff" />
@@ -743,7 +777,10 @@ export default function AdminScreen() {
                           <TouchableOpacity
                             style={s.btnShip}
                             disabled={isProcessing}
-                            onPress={() => handleUpdateOrderStatus(item.id, "shipping", "Đang giao")}
+                            onPress={(e) => {
+                              e.stopPropagation();
+                              handleUpdateOrderStatus(item.id, "shipping", "Đang giao");
+                            }}
                           >
                             <Ionicons name="bicycle-outline" size={14} color="#fff" />
                             <Text style={s.btnConfirmText}>Giao Hàng</Text>
@@ -754,7 +791,10 @@ export default function AdminScreen() {
                           <TouchableOpacity
                             style={s.btnComplete}
                             disabled={isProcessing}
-                            onPress={() => handleUpdateOrderStatus(item.id, "completed", "Hoàn tất")}
+                            onPress={(e) => {
+                              e.stopPropagation();
+                              handleUpdateOrderStatus(item.id, "completed", "Hoàn tất");
+                            }}
                           >
                             <Ionicons name="checkmark-done" size={14} color="#fff" />
                             <Text style={s.btnConfirmText}>Hoàn Tất</Text>
@@ -762,7 +802,7 @@ export default function AdminScreen() {
                         )}
                       </View>
                     </View>
-                  </View>
+                  </TouchableOpacity>
                 );
               }}
             />
@@ -1412,6 +1452,20 @@ export default function AdminScreen() {
         }}
         editingService={editingService}
       />
+
+      {/* ================= MODAL CHI TIẾT ĐƠN HÀNG ADMIN ================= */}
+      <AdminOrderDetailModal
+        visible={visibleOrderDetailModal}
+        orderId={selectedOrderForDetail?.id || null}
+        initialOrderSummary={selectedOrderForDetail}
+        onClose={() => {
+          setVisibleOrderDetailModal(false);
+          setSelectedOrderForDetail(null);
+        }}
+        onStatusUpdated={() => {
+          fetchAdminOrders();
+        }}
+      />
     </View>
   );
 }
@@ -1940,5 +1994,37 @@ const s = StyleSheet.create({
     fontSize: 12,
     color: "#6b7280",
     lineHeight: 16,
+  },
+  viewDetailTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    backgroundColor: "#fffbeb",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "#fde68a",
+  },
+  viewDetailTagText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#b45309",
+  },
+  btnDetailHint: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    backgroundColor: "#fffbeb",
+    borderColor: "#fde68a",
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  btnDetailHintText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#b45309",
   },
 });

@@ -1,5 +1,5 @@
-// app/(tabs)/account.tsx
 import { OrderHistoryModal } from "@/components/order/OrderHistoryModal";
+import { StatisticsModal } from "@/components/statistics/StatisticsModal";
 import { API_URL } from "@/constants/config";
 import { useAuthStore } from "@/src/stores/useAuthStore";
 import { Ionicons } from "@expo/vector-icons";
@@ -24,6 +24,7 @@ export default function AccountScreen() {
   const router = useRouter();
   const { user, isLoading, logout, initAuth } = useAuthStore();
   const [showOrders, setShowOrders] = useState(false);
+  const [showStats, setShowStats] = useState(false);
   const [orderCount, setOrderCount] = useState(0);
   const [totalSpent, setTotalSpent] = useState(0);
 
@@ -117,6 +118,29 @@ export default function AccountScreen() {
       {/* ACTIONS */}
       <Text style={styles.sectionHeader}>Quản Lý Mua Hàng</Text>
 
+      {/* BUTTON: THỐNG KÊ DOANH THU & KINH DOANH */}
+      <TouchableOpacity
+        style={[styles.actionCard, styles.statsActionCard]}
+        onPress={() => setShowStats(true)}
+        activeOpacity={0.8}
+      >
+        <View style={[styles.actionIconBox, styles.statsIconBox]}>
+          <Ionicons name="stats-chart" size={24} color="#d97706" />
+        </View>
+        <View style={styles.actionContent}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <Text style={[styles.actionTitle, styles.statsActionTitle]}>Thống Kê & Báo Cáo Doanh Thu</Text>
+            <View style={styles.statsPill}>
+              <Text style={styles.statsPillText}>HOT</Text>
+            </View>
+          </View>
+          <Text style={styles.actionDesc}>
+            Biểu đồ doanh thu 7 ngày, tổng đơn, top sản phẩm & tồn kho
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color="#d97706" />
+      </TouchableOpacity>
+
       {/* BUTTON: HÓA ĐƠN VÀ ĐƠN HÀNG */}
       <TouchableOpacity
         style={styles.actionCard}
@@ -162,6 +186,9 @@ export default function AccountScreen() {
 
       {/* MODAL LỊCH SỬ ĐƠN HÀNG & HÓA ĐƠN */}
       <OrderHistoryModal visible={showOrders} onClose={() => setShowOrders(false)} />
+
+      {/* MODAL THỐNG KÊ DOANH THU & KINH DOANH */}
+      <StatisticsModal visible={showStats} onClose={() => setShowStats(false)} />
     </ScrollView>
   );
 }
@@ -340,4 +367,25 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   btnLogoutText: { color: "#fff", fontSize: 16, fontWeight: "bold", marginLeft: 8 },
+  statsActionCard: {
+    borderColor: "#fde68a",
+    backgroundColor: "#fffdf5",
+  },
+  statsIconBox: {
+    backgroundColor: "#fef3c7",
+  },
+  statsActionTitle: {
+    color: "#b45309",
+  },
+  statsPill: {
+    backgroundColor: "#d97706",
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+  },
+  statsPillText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "800",
+  },
 });

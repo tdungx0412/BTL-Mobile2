@@ -227,13 +227,6 @@ export default function LoginScreen() {
             Đăng ký tài khoản đầy đủ (Họ tên, SĐT)
           </Text>
         </TouchableOpacity>
-
-        {/* ADMIN HINT */}
-        <View style={styles.adminHintBox}>
-          <Text style={styles.adminHintText}>
-            🔑 Tài khoản Quản trị viên: <Text style={{ fontWeight: "700" }}>admin</Text> / MK: <Text style={{ fontWeight: "700" }}>admin123</Text>
-          </Text>
-        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -378,16 +371,5 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "600",
     textDecorationLine: "underline",
-  },
-  adminHintBox: {
-    marginTop: 26,
-    padding: 10,
-    backgroundColor: "#f3f4f6",
-    borderRadius: 10,
-    alignItems: "center",
-  },
-  adminHintText: {
-    fontSize: 11,
-    color: "#6b7280",
   },
 });
